@@ -285,10 +285,11 @@ class Classifier:
         tot_cases = 0       # counter dei casi totali (sarebbe la len(dataset_val))
         for i, sample in enumerate(progress):
             progress.set_description(desc=f'Batch {i}/{n_batches} EVAL')
-            batch_cases = sample.shape[0]   # numero di sample nel batch
-            tot_cases += batch_cases        # accumulo il numero totale di sample
             images, labels = sample         # __getitem__ restituisce una tupla (image, label)
             images, labels = images.to(self.device), labels.to(self.device)
+
+            batch_cases = images.shape[0]  # numero di sample nel batch
+            tot_cases += batch_cases  # accumulo il numero totale di sample
 
             # outputs della rete
             logits, outputs = self.forward(images)
@@ -326,10 +327,11 @@ class Classifier:
         tot_cases = 0  # counter dei casi totali (sarebbe la len(dataset_test))
         for i, sample in enumerate(progress):
             progress.set_description(desc=f'Batch {i}/{n_batches} TEST')
-            batch_cases = sample.shape[0]  # numero di sample nel batch
-            tot_cases += batch_cases  # accumulo il numero totale di sample
             images, labels = sample  # __getitem__ restituisce una tupla (image, label)
             images, labels = images.to(self.device), labels.to(self.device)
+
+            batch_cases = images.shape[0]  # numero di sample nel batch
+            tot_cases += batch_cases  # accumulo il numero totale di sample
 
             # outputs della rete
             _, outputs = self.forward(images)
