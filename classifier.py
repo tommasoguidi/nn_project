@@ -33,7 +33,7 @@ class MyDataset(Dataset):
         """
         self.path = path
         self.img_dir = path / 'images'
-        self.annos = pd.read_csv(path / 'subset_images.csv', index_col='image_id')  # leggo il csv con pandas
+        self.annos = pd.read_csv(path / 'subset_10_images.csv', index_col='image_id')  # leggo il csv con pandas
         self.n_folds = n_folds
         self.split = split
         self.mode = mode
@@ -483,7 +483,7 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Train del classificatore',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--root', type=str, default=r'C:\Users\rx571gt-b034t\Desktop\PROJECT\subset',
+    parser.add_argument('--root', type=str, default=r'C:\Users\rx571gt-b034t\Desktop\PROJECT\subset_10',
                         help='Root del dataset.')
     parser.add_argument('--n-folds', type=int, default=3, help='Numero di fold per la cross validation')
     parser.add_argument('-m', '--mode', type=str, default='train',
@@ -500,7 +500,7 @@ if __name__ == '__main__':
                         help='Cartella dove salvare i risultati dei vari esperimenti. Se --mode == "train" specificare'
                              ' la cartella madre che contiene tutte le annotazioni sugli esperimenti; se --mode =='
                              ' "eval" indicare la cartella dello specifico esperimento che si vuole valutare.')
-    parser.add_argument('--num-classes', type=int, default=50, help='Numero di classi nel dataset.')
+    parser.add_argument('--num-classes', type=int, default=10, help='Numero di classi nel dataset.')
 
     arguments = parser.parse_args()
     main(arguments)
