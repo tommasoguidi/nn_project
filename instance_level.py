@@ -43,7 +43,13 @@ class MyDataset(Dataset):
             self.split = self.n_folds
         self.transforms = transforms
         self.all_ids = self.annos.index.tolist()    # lista di tutti gli image_id
-        self.all_classes = sorted(self.annos['product_type'].unique().tolist())     # tutte le classi del dataset
+        #
+        #
+        # QUI CAMBIA RISPETTO A PRIMA PERCHE' LE CLASSI DIVENTANO I PRODUCT_ID UNIVOCI PER OGNI PRODOTTO
+        #
+        #
+        self.all_classes = sorted(self.annos['product_id'].unique().tolist())     # tutte le classi del dataset
+        self.all_super_classes = sorted(self.annos['product_id'].unique().tolist())     # classi del caso semplice
         self.mapping = {i: j for j, i in enumerate(self.all_classes)}       # mapping classe_i -> j (intero)
         # ciclicamente solo una porzione del dataset completo viene utilizzata (sarà usata come validation set)
         self.image_ids = self._get_ids_in_split()
@@ -70,7 +76,7 @@ class MyDataset(Dataset):
         # a questo punto del progetto l'interesse è quello di allenare un classificatore in grado di riconoscere la
         # categoria merceologica cui l'oggetto appartiene. la label quindi sarà il valore 'product_type' che viene
         # mappato al suo valore intero di riferimento e trasformato in un tensore
-        label = self.annos.loc[image_id, 'product_type']
+        label = self.annos.loc[image_id, 'product_id']
         label = torch.tensor(self.mapping[label], dtype=torch.long)
 
         return image, label
@@ -84,7 +90,7 @@ class MyDataset(Dataset):
         ids_in_split = []
         for _class in self.all_classes:
             # metto in una lista tutte gli image_id di una determinata classe
-            ids_in_class = self.annos.index[self.annos['product_type'] == _class].tolist()
+            ids_in_class = self.annos.index[self.annos['product_id'] == _class].tolist()
             # splitto in n_folds + 1 per avere un hold out su cui fare il test (l'ultimo degli split)
             ids_per_split = len(ids_in_class) // (self.n_folds + 1)     # n di immagini che metto nello split
             # se siamo in train mode self.split è scandito dal loop del kfold 0,1,...,k
@@ -228,7 +234,7 @@ class Classifier:
         optimizer.zero_grad()   # svuoto i gradienti
 
         n_batches = len(dataloader)
-        progress = tqdm(dataloader, total=n_batches, leave=False, desc='COMPLETED BATCHES')
+        progress = tqdm(dataloader, total=n_batches, leave=False, desc='EPOCH')
         epoch_loss = 0.0    # inizializzo la loss
         epoch_correct = 0   # segno le prediction corrette della rete per poi calcolare l'accuracy
         tot_cases = 0       # counter dei casi totali (sarebbe la len(dataset_train))
@@ -256,7 +262,7 @@ class Classifier:
             epoch_correct += batch_correct.item()      # totale risposte corrette sull'epoca
 
             postfix = {'batch_mean_loss': batch_loss.item()/batch_cases,
-                       'batch_accuracy': (batch_correct.item()/batch_cases) * 100.0}
+                       'batch_accuracy': batch_correct.item()/batch_cases}
             progress.set_postfix(postfix)
 
         epoch_mean_loss = epoch_loss / tot_cases        # loss media sull'epoca
@@ -359,7 +365,7 @@ class Classifier:
         # batch e dividerle a fine epoca per ottenere la loss
         criterion = nn.CrossEntropyLoss(reduction='sum')
         ckpt_dir = self.ckpt_dir / f'fold_{split}'
-        progress = tqdm(range(epochs), total=epochs, leave=False, desc='COMPLETED EPOCHS')
+        progress = tqdm(range(epochs), total=epochs, leave=False, desc='FOLD')
         # creo un summary writer per salvare le metriche (loss e accuracy)
         writer = SummaryWriter(log_dir=str(ckpt_dir))
 
@@ -439,7 +445,7 @@ def main(args):
         for i in tqdm(range(N_FOLDS), total=N_FOLDS, desc='Creo gli split del dataset.'):
             splits.append(MyDataset(ROOT, N_FOLDS, i, mode=MODE, transforms=val_transforms))
 
-        for i, split in tqdm(enumerate(splits), total=N_FOLDS, desc='COMPLETED FOLDS'):
+        for i, split in tqdm(enumerate(splits), total=N_FOLDS, desc=f'{N_FOLDS}-fold cross validation...'):
             # ciclicamente uso uno split come val, reimposto le transforms a val_transforms nel caso fossero state
             # cambiate in precedenza
             val_ds = split  # split è il dataset che sto usando come validation
@@ -495,10 +501,15 @@ if __name__ == '__main__':
     parser.add_argument('--batch-size', type=int, default=16, help='Numero di esempi in ogni batch.')
     parser.add_argument('--num-workers', type=int, default=3, help='Numero di worker.')
     parser.add_argument('--lr', type=float, default=0.001, help='Learning rate.')
-    parser.add_argument('--checkpoint_dir', type=str, default='runs/classifier',
+    parser.add_argument('--checkpoint_dir', type=str, default='runs/instance_level',
                         help='Cartella dove salvare i risultati dei vari esperimenti. Se --mode == "train" specificare'
                              ' la cartella madre che contiene tutte le annotazioni sugli esperimenti; se --mode =='
                              ' "eval" indicare la cartella dello specifico esperimento che si vuole valutare.')
+    parser.add_argument('--head', type=str, default='moe',
+                        help='Scegliere se usare un approccio "naive" (#neuroni_out == #classi) o "moe"'
+                             ' (mixture of experts).')
+    parser.add_argument('--weights', type=str, default='',
+                        help='Percorso dei pesi da usare per il feature extractor.')
 
     arguments = parser.parse_args()
     main(arguments)
