@@ -190,7 +190,7 @@ class Classifier:
             #     p.requires_grad = False
             # congelo i parametri tranne quelli degli ultimi 3 blocchi
             blocks = list(self.model.children())
-            for b in blocks[:-2]:
+            for b in blocks[:-3]:
                 for p in b.parameters():
                     p.requires_grad = False
             # layer finale
