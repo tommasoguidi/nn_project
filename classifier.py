@@ -5,6 +5,7 @@ from pathlib import Path
 from tqdm import tqdm
 import argparse
 import cv2
+import random
 
 import torch
 from torch.utils.data import Dataset, DataLoader
@@ -85,6 +86,7 @@ class MyDataset(Dataset):
         for _class in self.all_classes:
             # metto in una lista tutte gli image_id di una determinata classe
             ids_in_class = self.annos.index[self.annos['product_type'] == _class].tolist()
+            random.shuffle(ids_in_class)
             # splitto in n_folds + 1 per avere un hold out su cui fare il test (l'ultimo degli split)
             ids_per_split = len(ids_in_class) // (self.n_folds + 1)     # n di immagini che metto nello split
             # se siamo in train mode self.split è scandito dal loop del kfold 0,1,...,k
@@ -186,6 +188,11 @@ class Classifier:
             # congelo i parametri per allenare solo il layer finale
             # for p in self.model.parameters():
             #     p.requires_grad = False
+            # congelo i parametri tranne quelli degli ultimi 3 blocchi
+            blocks = self.model.children()
+            for b in blocks[:-3]:
+                for p in b.parameters():
+                    p.requires_grad = False
             # layer finale
             self.model.fc = nn.Linear(2048, self.outputs)
 
@@ -301,6 +308,10 @@ class Classifier:
             epoch_loss += batch_loss.item()    # avendo usato reduction='sum' nella loss qui sto sommando la loss totale
             batch_correct = torch.sum(batch_decisions == labels)  # risposte corrette per il batch attuale
             epoch_correct += batch_correct.item()      # totale risposte corrette sull'epoca
+
+            postfix = {'batch_mean_loss': batch_loss.item() / batch_cases,
+                       'batch_accuracy': (batch_correct.item() / batch_cases) * 100.0}
+            progress.set_postfix(postfix)
 
         epoch_mean_loss = epoch_loss / tot_cases        # loss media sull'epoca
         epoch_accuracy = (epoch_correct / tot_cases) * 100.0        # accuracy sull'epoca (%)
