@@ -90,7 +90,16 @@ def get_useful_listings(listings_dir: Path, dest_dir: Path, imgs_metadata: pd.Da
     # value_counts restituisce una serie con il numero di volte in cui un'entrata compare nella colonna 'product_type'
     # in ordine decrescente, le classi selezionate saranno dunque gli indici di questa serie
     top_n = useful_listings['product_type'].value_counts()[0: args.n_cat]
-    top_n = top_n.index.to_list()
+    top_n_classes = top_n.index.to_list()
+    top_n_imgs_per_class = top_n.to_list()
+    useful_listings = useful_listings[useful_listings['product_type'].isin(top_n_classes)]
+
+    # essendo molto sbilanciato, andremo a fare un subsampling delle classi più rappresentate, per evitare di tenere
+    # nel dataset prodotti con meno di --min-images immagini, faremo il sampling sui prodotti invece che sulle immagini
+    avg = int(np.mean(top_n_imgs_per_class))     # numero medio di immagini in ciascuna delle top_n classi
+    for _class, _n_imgs in zip(top_n_classes, top_n_imgs_per_class):
+        if _n_imgs > avg:
+            p = _n_imgs / avg
 
     # finalmente tutte e sole le inserzioni ceh ci interessano
     final_metadata = useful_listings[useful_listings['product_type'].isin(top_n)]
@@ -171,10 +180,10 @@ if __name__ == '__main__':
     parser.add_argument('--size', type=int, default=224, help='Dimensione finale delle immagini (quadrate).')
     parser.add_argument('--min-images', type=int, default=5, help='Scarta le inserzioni con un numero di immagini '
                                                                   'inferiore per poter fare crossvalidation.')
-    parser.add_argument('--n-cat', type=int, default=50, help='Per selezionare solo le classi più rappresentate.')
+    parser.add_argument('--n-cat', type=int, default=10, help='Per selezionare solo le classi più rappresentate.')
     parser.add_argument('--root', type=str, default=r'C:\Users\rx571gt-b034t\Desktop\PROJECT\ABO_DATASET',
                         help='Root del dataset.')
-    parser.add_argument('--dest', type=str, default=r'C:\Users\rx571gt-b034t\Desktop\PROJECT\subset',
+    parser.add_argument('--dest', type=str, default=r'C:\Users\rx571gt-b034t\Desktop\PROJECT\subset_10',
                         help='Directory in cui salvare il dataset preprocessato.')
     arguments = parser.parse_args()
     main(arguments)
