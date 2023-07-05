@@ -51,7 +51,7 @@ def get_useful_listings(listings_dir: Path, dest_dir: Path, imgs_metadata: pd.Da
     useful_listings = pd.DataFrame()
     n_listings = len(listings)
     useful_index = set(imgs_metadata.index.tolist())
-    for i in tqdm(listings, total=n_listings, desc='Estraggo le infromazioni delle inserzioni'):
+    for i in tqdm(listings, total=n_listings, desc='Estraggo le informazioni delle inserzioni'):
         archive = listings_dir / i
         with gzip.open(archive, 'rb') as f:
             data = pd.read_json(f, lines=True)
@@ -97,13 +97,24 @@ def get_useful_listings(listings_dir: Path, dest_dir: Path, imgs_metadata: pd.Da
     # essendo molto sbilanciato, andremo a fare un subsampling delle classi più rappresentate, per evitare di tenere
     # nel dataset prodotti con meno di --min-images immagini, faremo il sampling sui prodotti invece che sulle immagini
     avg = int(np.mean(top_n_imgs_per_class))     # numero medio di immagini in ciascuna delle top_n classi
+    product_kept = []   # lista dei product id da tenere nel subset
     for _class, _n_imgs in zip(top_n_classes, top_n_imgs_per_class):
+        # filtro il dataframe per tenere solo le righe della specifica classe
+        _class_listings = useful_listings[useful_listings['product_type'] == _class]
+        # salvo in una lista gli item_id unici, se la classe è sottorappresentata li tengo tutti, altrimenti sampling
+        _products = _class_listings['item_id'].unique().tolist()
         if _n_imgs > avg:
-            p = _n_imgs / avg
+            _p = avg / _n_imgs   # probabilità di tenere il prodotto
+            _u = np.random.uniform(size=_n_imgs)     # campione di distribuzione uniforme
+            _choice = _u < _p  # array di booleani
+            # tengo solo i prodotti per cui l'elemento di _choice con stesso indice è True
+            _products = [p for p, b in zip(_products, _choice) if b]
+        # una volta filtrati aggiungo i prodotti alla lista dei prodotti da tenere
+        product_kept.extend(_products)
 
     # finalmente tutte e sole le inserzioni ceh ci interessano
-    final_metadata = useful_listings[useful_listings['product_type'].isin(top_n)]
-    f_name = dest_dir / 'subset_images.csv'
+    final_metadata = useful_listings[useful_listings['item_id'].isin(product_kept)]
+    f_name = dest_dir / 'subset_10_images.csv'
     final_metadata.to_csv(f_name)
     return final_metadata
 
@@ -145,8 +156,7 @@ def save_images(imgs_dir: Path, dest_dir: Path, metadata: pd.DataFrame, args: ar
         # salviamo l'immagine
         dest_fname = dest_dir / data['path']
         dest_subdir = dest_dir / (data['path'].split('/')[0])
-        if not os.path.exists(dest_subdir):
-            os.mkdir(dest_subdir)
+        os.makedirs(dest_subdir, exist_ok=True)
         cv2.imwrite(str(dest_fname), resized)
 
 

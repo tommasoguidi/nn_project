@@ -146,7 +146,7 @@ class Concat(Dataset):
 class Classifier:
     """Classificatore per le 50 classi in esame"""
 
-    def __init__(self, backbone: str, device: str, ckpt_dir: Path):
+    def __init__(self, backbone: str, device: str, ckpt_dir: Path, classes: int):
         """
 
         :param backbone:    la rete alla base del classificatore (cnn base o resnet).
@@ -156,27 +156,27 @@ class Classifier:
         self.device = device
         self.ckpt_dir = ckpt_dir
         self.model = None
-        self.outputs = 50   # quante sono le classi nel nostro caso
+        self.outputs = classes   # quante sono le classi nel nostro caso
 
         if backbone == 'cnn':
             # implementazione di una cnn standard
             self.model = nn.Sequential(
                 nn.Conv2d(in_channels=3, out_channels=64, kernel_size=5, padding=2, padding_mode='reflect'),
-                nn.ReLU(inplace=True),
+                nn.ReLU(),
                 nn.MaxPool2d(kernel_size=3),
                 nn.Conv2d(in_channels=64, out_channels=128, kernel_size=5, padding=2, padding_mode='reflect'),
-                nn.ReLU(inplace=True),
+                nn.ReLU(),
                 nn.MaxPool2d(kernel_size=3),
                 nn.Conv2d(in_channels=128, out_channels=256, kernel_size=3, padding=1, padding_mode='reflect'),
-                nn.ReLU(inplace=True),
+                nn.ReLU(),
                 nn.MaxPool2d(kernel_size=3),
                 nn.Conv2d(in_channels=256, out_channels=512, kernel_size=3, padding=1, padding_mode='reflect'),
-                nn.ReLU(inplace=True),
+                nn.ReLU(),
                 nn.MaxPool2d(kernel_size=3),
                 nn.Flatten(),
                 nn.Linear(512 * 2 * 2, 4096),
-                nn.ReLU(inplace=True),
-                nn.Dropout(inplace=True),
+                nn.ReLU(),
+                nn.Dropout(),
                 nn.Linear(4096, self.outputs)
             )
 
@@ -401,6 +401,7 @@ def main(args):
     NUM_WORKERS = args.num_workers
     LR = args.lr
     CHECKPOINT_DIR = Path(args.checkpoint_dir)
+    NUM_CLASSES = args.num_classes
 
     assert MODE in ['train', 'eval'], '--mode deve essere uno tra "train" e "eval".'
     assert DEVICE in ['cuda', 'gpu'], '--device deve essere uno tra "cuda" e "gpu".'
@@ -454,7 +455,7 @@ def main(args):
             train_ds = Concat(train_datasets)
             train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
 
-            cls = Classifier(BACKBONE, DEVICE, actual_dir)      # inizializzo il classificatore
+            cls = Classifier(BACKBONE, DEVICE, actual_dir, NUM_CLASSES)      # inizializzo il classificatore
             train_result = cls.train(train_loader, val_loader, i, EPOCHS, LR)      # alleno
             best_results.append(train_result)
 
@@ -499,6 +500,7 @@ if __name__ == '__main__':
                         help='Cartella dove salvare i risultati dei vari esperimenti. Se --mode == "train" specificare'
                              ' la cartella madre che contiene tutte le annotazioni sugli esperimenti; se --mode =='
                              ' "eval" indicare la cartella dello specifico esperimento che si vuole valutare.')
+    parser.add_argument('--num-classes', type=int, default=50, help='Numero di classi nel dataset.')
 
     arguments = parser.parse_args()
     main(arguments)
