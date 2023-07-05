@@ -184,8 +184,8 @@ class Classifier:
             # carico il modello pretrainato di resnet50 su imagenet
             self.model = resnet50(weights='DEFAULT', progress=True)
             # congelo i parametri per allenare solo il layer finale
-            for p in self.model.parameters():
-                p.requires_grad = False
+            # for p in self.model.parameters():
+            #     p.requires_grad = False
             # layer finale
             self.model.fc = nn.Linear(2048, self.outputs)
 

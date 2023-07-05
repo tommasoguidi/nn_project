@@ -407,6 +407,9 @@ def main(args):
     NUM_WORKERS = args.num_workers
     LR = args.lr
     CHECKPOINT_DIR = Path(args.checkpoint_dir)
+    NUM_CLASSES = args.num_classes
+    HEAD = args.head
+    WEIGHTS = args.weights
 
     assert MODE in ['train', 'eval'], '--mode deve essere uno tra "train" e "eval".'
     assert DEVICE in ['cuda', 'gpu'], '--device deve essere uno tra "cuda" e "gpu".'
@@ -505,6 +508,7 @@ if __name__ == '__main__':
                         help='Cartella dove salvare i risultati dei vari esperimenti. Se --mode == "train" specificare'
                              ' la cartella madre che contiene tutte le annotazioni sugli esperimenti; se --mode =='
                              ' "eval" indicare la cartella dello specifico esperimento che si vuole valutare.')
+    parser.add_argument('--num-classes', type=int, default=10, help='Numero di classi nel dataset.')
     parser.add_argument('--head', type=str, default='moe',
                         help='Scegliere se usare un approccio "naive" (#neuroni_out == #classi) o "moe"'
                              ' (mixture of experts).')
