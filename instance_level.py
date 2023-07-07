@@ -296,6 +296,7 @@ class Classifier:
 
         # # stampa a schermo la rete
         # summary(self.model, input_size=(1, 3, 224, 224))
+        self.model.to(self.device)
 
     def load(self, weights: Path):
         """
@@ -347,7 +348,6 @@ class Classifier:
         for sample in progress:
             images, _, labels = sample             # non mi interessa della super class
             images, labels = images.to(self.device), labels.to(self.device)
-            print(images.is_cuda, labels.is_cuda)
 
             batch_cases = images.shape[0]  # numero di sample nel batch
             tot_cases += batch_cases  # accumulo il numero totale di sample
