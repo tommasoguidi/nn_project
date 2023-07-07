@@ -752,6 +752,7 @@ def main(args):
             # ciclicamente uso uno split come val, reimposto le transforms a val_transforms nel caso fossero state
             # cambiate in precedenza
             val_ds = split  # split è il dataset che sto usando come validation
+            print(len(val_ds))
             class_mapping = val_ds.mapping
             val_ds.set_transforms(val_transforms)
             val_loader = DataLoader(val_ds, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS)
@@ -759,9 +760,11 @@ def main(args):
             # gli altri split li uso per il train, mettendoli in una lista e passandoli a Concat, settando prima le
             # train_transform
             train_datasets = [j for j in splits if j is not split]  # come train uso gli altri, unendoli con Concat
+            print(len(train_datasets))
             for d in train_datasets:
                 d.set_transforms(train_transforms)
             train_ds = Concat(train_datasets)
+            print(len(train_ds))
             train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
 
             cls = Classifier(METHOD, DEVICE, actual_dir, class_mapping, WEIGHTS)      # inizializzo il classificatore
