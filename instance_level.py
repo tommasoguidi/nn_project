@@ -12,7 +12,8 @@ from torch.utils.tensorboard import SummaryWriter
 import torch.nn as nn
 import torch.nn.functional as F
 from torchvision import transforms
-from torchvision.models import resnet50
+from torchvision.models.resnet import resnet50, ResNet
+from torchvision.models._utils import _ovewrite_named_param
 from torchinfo import summary
 
 
@@ -48,9 +49,19 @@ class MyDataset(Dataset):
         # QUI CAMBIA RISPETTO A PRIMA PERCHE' LE CLASSI DIVENTANO I PRODUCT_ID UNIVOCI PER OGNI PRODOTTO
         #
         #
-        self.all_classes = sorted(self.annos['product_id'].unique().tolist())     # tutte le classi del dataset
-        self.all_super_classes = sorted(self.annos['product_id'].unique().tolist())     # classi del caso semplice
-        self.mapping = {i: j for j, i in enumerate(self.all_classes)}       # mapping classe_i -> j (intero)
+        self.all_classes = self.annos['product_id'].unique().tolist()   # tutte le classi del dataset
+        self.all_super_classes = sorted(self.annos['item_id'].unique().tolist())     # classi del caso semplice
+        self.mapping = {}
+        for i, super_class in enumerate(self.all_super_classes):
+            # tutte le righe del dataframe relative ad una categoria merceologica
+            _listings_in_superclass = self.annos[self.annos['product_id'] == super_class]
+            # lista degli item_id univoci della superclass (metterli in ordine ovviamente non cambia niente)
+            _items_in_superclass = sorted(_listings_in_superclass['item_id'].unique().tolist())
+            # identifier sarà l'int che identifica la superclass i
+            self.mapping[super_class] = {'identifier': i}
+            # sotto la superclass, associo un intero a ciascuno degli item univoci
+            for j, item_id in enumerate(_items_in_superclass):
+                self.mapping[super_class][item_id] = j
         # ciclicamente solo una porzione del dataset completo viene utilizzata (sarà usata come validation set)
         self.image_ids = self._get_ids_in_split()
 
@@ -73,13 +84,15 @@ class MyDataset(Dataset):
         if self.transforms:
             image = self.transforms(image)  # applico le trasformazioni desiderate
 
-        # a questo punto del progetto l'interesse è quello di allenare un classificatore in grado di riconoscere la
-        # categoria merceologica cui l'oggetto appartiene. la label quindi sarà il valore 'product_type' che viene
-        # mappato al suo valore intero di riferimento e trasformato in un tensore
-        label = self.annos.loc[image_id, 'product_id']
-        label = torch.tensor(self.mapping[label], dtype=torch.long)
+        # a questo punto del progetto l'interesse è quello di allenare un classificatore in grado di riconoscere
+        # l'oggetto in particolare. la item_label quindi sarà il valore 'item_id', mentre la super_class_label è
+        # 'product_type', che vengono mappati al loro valore intero di riferimento e trasformati in un tensore
+        super_class_label = self.annos.loc[image_id, 'product_type']
+        super_class_label = torch.tensor(self.mapping[super_class_label]['identifier'], dtype=torch.long)
+        item_label = self.annos.loc[image_id, 'item_id']
+        item_label = torch.tensor(self.mapping[super_class_label][item_label], dtype=torch.long)
 
-        return image, label
+        return image, super_class_label, item_label
 
     def _get_ids_in_split(self):
         """
@@ -87,6 +100,8 @@ class MyDataset(Dataset):
         il dataset completo in n_folds+1 parti (bilanciate) così da poter fare crossvalidation usando stratified
         k-folding e al tempo stesso tenere da parte un hold out set per fare test
         """
+        # a senso non dovrebbe cambiare niente rispetto al caso semplice, ovviamente a questo giro all_classes sono
+        # gli item_id invece dei product_type
         ids_in_split = []
         for _class in self.all_classes:
             # metto in una lista tutte gli image_id di una determinata classe
@@ -149,44 +164,92 @@ class Concat(Dataset):
                 return self.datasets[i][index]
 
 
+class Head(nn.Module):
+    """Questa è la classe base delle classification heads usate nel caso 'moe'."""
+    def __init__(self, in_features: int, classes: int):
+        super().__init__()
+        self.layer1 = nn.Linear(in_features, classes)
+
+    def forward(self, x):
+        logits = self.layer1(x)  # output della rete prima di applicare softmax
+        outputs = F.softmax(logits, dim=1)  # class probabilities
+        return logits, outputs
+
+
+class MyResNet(ResNet):
+    """Riscrivo il forward della ResNet originaria per prelevare il vettore delle features"""
+    def _forward_impl(self, x: torch.Tensor):
+        # implementazione ufficiale pytorch del forward, modificata per ritornare il feature vector
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.relu(x)
+        x = self.maxpool(x)
+
+        x = self.layer1(x)
+        x = self.layer2(x)
+        x = self.layer3(x)
+        x = self.layer4(x)
+
+        x = self.avgpool(x)
+        feature_vector = torch.flatten(x, 1)
+        x = self.fc(feature_vector)
+
+        return x, feature_vector
+
+
+def _resnet(block, layers, weights, progress, **kwargs) -> ResNet:
+    """Questo è il metodo utilizzato per costruire la ResNet."""
+    if weights is not None:
+        _ovewrite_named_param(kwargs, "num_classes", len(weights.meta["categories"]))
+
+    # uso la resnet modificata sopra
+    model = MyResNet(block, layers, **kwargs)
+
+    if weights is not None:
+        model.load_state_dict(weights.get_state_dict(progress=progress))
+
+    return model
+
+
 class Classifier:
     """Classificatore per le 50 classi in esame"""
 
-    def __init__(self, backbone: str, device: str, ckpt_dir: Path):
+    def __init__(self, method: str, device: str, ckpt_dir: Path, mapping: dict, weights: Path):
         """
 
-        :param backbone:    la rete alla base del classificatore (cnn base o resnet).
+        :param method:      come classificare le varie istanze (naive o mixture of expert).
         :param device:      per decidere se svolgere i conti sulla cpu o sulla gpu.
         :param ckpt_dir:    directory in cui salvare i risultati dei vari esperimetni di train.
+        :param mapping:     mapping delle classi.
+        :param weights:     percorso dei pesi da caricare.
         """
+        self.method = method
         self.device = device
         self.ckpt_dir = ckpt_dir
         self.model = None
-        self.outputs = 50   # quante sono le classi nel nostro caso
+        self.num_super_classes = len(mapping)   # numero delle superclassi
+        # lista con il numero di sottoclassi per ogni superclasse (-1 perchè va scartato l'identifier della superclasse)
+        self.len_item_classes = [len(mapping[key]) - 1 for key in mapping]
 
-        if backbone == 'cnn':
-            # implementazione di una cnn standard
-            self.model = nn.Sequential(
-                nn.Conv2d(in_channels=3, out_channels=64, kernel_size=5, padding=2, padding_mode='reflect'),
-                nn.ReLU(inplace=True),
-                nn.MaxPool2d(kernel_size=3),
-                nn.Conv2d(in_channels=64, out_channels=128, kernel_size=5, padding=2, padding_mode='reflect'),
-                nn.ReLU(inplace=True),
-                nn.MaxPool2d(kernel_size=3),
-                nn.Conv2d(in_channels=128, out_channels=256, kernel_size=3, padding=1, padding_mode='reflect'),
-                nn.ReLU(inplace=True),
-                nn.MaxPool2d(kernel_size=3),
-                nn.Conv2d(in_channels=256, out_channels=512, kernel_size=3, padding=1, padding_mode='reflect'),
-                nn.ReLU(inplace=True),
-                nn.MaxPool2d(kernel_size=3),
-                nn.Flatten(),
-                nn.Linear(512 * 2 * 2, 4096),
-                nn.ReLU(inplace=True),
-                nn.Dropout(inplace=True),
-                nn.Linear(4096, self.outputs)
-            )
+        if self.method == 'naive':
+            # carico il modello di resnet50 senza pretrain
+            self.model = resnet50()
+            # prima di caricare i pesi del classificatore allenato lo devo modificare come era stato fatto
+            # in precedenza, quindi modifico il layer finale della resnet
+            self.model.fc = nn.Linear(2048, self.num_super_classes)
+            self.load(weights)
+            # # congelo i parametri per allenare solo il layer finale
+            # for p in self.model.parameters():
+            #     p.requires_grad = False
+            # congelo i parametri tranne quelli degli ultimi 3 blocchi
+            blocks = list(self.model.children())
+            for b in blocks[:-3]:
+                for p in b.parameters():
+                    p.requires_grad = False
+            # layer finale, a questo giro tanti neuroni quanto il numero di singoli prodotti
+            self.model.fc = nn.Linear(2048, sum(self.len_item_classes))
 
-        elif backbone == 'resnet':
+        else:
             # carico il modello pretrainato di resnet50 su imagenet
             self.model = resnet50(weights='DEFAULT', progress=True)
             # congelo i parametri per allenare solo il layer finale
@@ -198,10 +261,14 @@ class Classifier:
         # stampa a schermo la rete
         summary(self.model, input_size=(1, 3, 224, 224))
 
-    def load(self):
-        """Carica il modello scelto."""
-        fname = next(self.ckpt_dir.glob('*.pth'))  # nome del file da caricare
-        model_state = torch.load(fname, map_location=self.device)
+    def load(self, weights: Path):
+        """
+        Carica il modello scelto.
+
+        :param weights:     percorso dei pesi da caricare.
+        :return:
+        """
+        model_state = torch.load(weights, map_location=self.device)
         self.model.load_state_dict(model_state["model"])
         self.model.to(self.device)
 
@@ -401,36 +468,26 @@ def main(args):
     MODE = args.mode
     N_FOLDS = args.n_folds
     DEVICE = args.device
-    BACKBONE = args.backbone
     EPOCHS = args.epochs
     BATCH_SIZE = args.batch_size
     NUM_WORKERS = args.num_workers
     LR = args.lr
     CHECKPOINT_DIR = Path(args.checkpoint_dir)
     NUM_CLASSES = args.num_classes
-    HEAD = args.head
-    WEIGHTS = args.weights
+    METHOD = args.method
+    WEIGHTS = Path(args.weights)
 
     assert MODE in ['train', 'eval'], '--mode deve essere uno tra "train" e "eval".'
     assert DEVICE in ['cuda', 'gpu'], '--device deve essere uno tra "cuda" e "gpu".'
-    assert BACKBONE in ['cnn', 'resnet'], 'le --backbone disponibili sono: "cnn" e "resnet".'
+    assert METHOD in ['naive', 'moe'], 'scegliere --head "naive" se si vuole semplicemente avere tanti output neurons' \
+                                     ' quanti sono gli oggetti oppure "moe" per usare un ensemble di classificatori' \
+                                     ' specifici ciascuno per ogni categoria merceologica.'
 
-    if BACKBONE == 'resnet':
-        train_transforms = transforms.Compose([transforms.ToTensor(),
-                                               transforms.RandomAffine(45, translate=(0.1, 0.1),
-                                                                       scale=(0.8, 1.2), fill=255),
-                                               transforms.RandomHorizontalFlip(p=0.5),
-                                               transforms.Normalize(mean=torch.tensor([0.485, 0.456, 0.406]),
-                                                                    std=torch.tensor([0.229, 0.224, 0.225]))])
-        val_transforms = transforms.Compose([transforms.ToTensor(),
-                                             transforms.Normalize(mean=torch.tensor([0.485, 0.456, 0.406]),
-                                                                  std=torch.tensor([0.229, 0.224, 0.225]))])
-    elif BACKBONE == 'cnn':
-        train_transforms = transforms.Compose([transforms.ToTensor(),
-                                               transforms.RandomAffine(45, translate=(0.1, 0.1),
-                                                                       scale=(0.8, 1.2), fill=255),
-                                               transforms.RandomHorizontalFlip(p=0.5)])
-        val_transforms = transforms.Compose([transforms.ToTensor()])
+    train_transforms = transforms.Compose([transforms.ToTensor(),
+                                           transforms.RandomAffine(45, translate=(0.1, 0.1),
+                                                                   scale=(0.8, 1.2), fill=255),
+                                           transforms.RandomHorizontalFlip(p=0.5)])
+    val_transforms = transforms.Compose([transforms.ToTensor()])
 
     # train mode
     if MODE == 'train':
@@ -498,8 +555,6 @@ if __name__ == '__main__':
                         help='Scegliere tra "train" e "eval" in base a quale modalità si desidera.')
     parser.add_argument('--device', type=str, default='cuda',
                         help='Scegliere se usare la gpu ("cuda") o la "cpu".')
-    parser.add_argument('-b', '--backbone', type=str, default='resnet',
-                        help='Scegliere se utilizzare una semplice "cnn" o la "resnet" come features extractor.')
     parser.add_argument('-e', '--epochs', type=int, default=25, help='Epoche per eseguire il train')
     parser.add_argument('--batch-size', type=int, default=16, help='Numero di esempi in ogni batch.')
     parser.add_argument('--num-workers', type=int, default=3, help='Numero di worker.')
@@ -509,10 +564,14 @@ if __name__ == '__main__':
                              ' la cartella madre che contiene tutte le annotazioni sugli esperimenti; se --mode =='
                              ' "eval" indicare la cartella dello specifico esperimento che si vuole valutare.')
     parser.add_argument('--num-classes', type=int, default=10, help='Numero di classi nel dataset.')
-    parser.add_argument('--head', type=str, default='moe',
+    parser.add_argument('--method', type=str, default='moe',
                         help='Scegliere se usare un approccio "naive" (#neuroni_out == #classi) o "moe"'
-                             ' (mixture of experts).')
-    parser.add_argument('--weights', type=str, default='',
+                             ' (mixture of experts). Il metodo naive carica il classificatore ottenuto al passo'
+                             ' precedente e ne allena gli strati finali usando tanti neuroni di output quanti'
+                             ' sono i singoli prodotti; il metodo moe usa una ensemble di classificatori, ciascuno'
+                             ' specializzato su una determinata categoria merceologica, riallenando al tempo stesso'
+                             ' anche la backbone a partire dai pesi di imagenet.')
+    parser.add_argument('--weights', type=str, default='classifier.pth',
                         help='Percorso dei pesi da usare per il feature extractor.')
 
     arguments = parser.parse_args()

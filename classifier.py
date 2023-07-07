@@ -148,17 +148,18 @@ class Concat(Dataset):
 class Classifier:
     """Classificatore per le 50 classi in esame"""
 
-    def __init__(self, backbone: str, device: str, ckpt_dir: Path, classes: int):
+    def __init__(self, backbone: str, device: str, ckpt_dir: Path, mapping: dict):
         """
 
         :param backbone:    la rete alla base del classificatore (cnn base o resnet).
         :param device:      per decidere se svolgere i conti sulla cpu o sulla gpu.
         :param ckpt_dir:    directory in cui salvare i risultati dei vari esperimetni di train.
+        :param mapping:     mapping delle classi.
         """
         self.device = device
         self.ckpt_dir = ckpt_dir
         self.model = None
-        self.outputs = classes   # quante sono le classi nel nostro caso
+        self.outputs = len(mapping)   # quante sono le classi nel nostro caso
 
         if backbone == 'cnn':
             # implementazione di una cnn standard
@@ -199,10 +200,14 @@ class Classifier:
         # stampa a schermo la rete
         summary(self.model, input_size=(1, 3, 224, 224))
 
-    def load(self):
-        """Carica il modello scelto."""
-        fname = next(self.ckpt_dir.glob('*.pth'))  # nome del file da caricare
-        model_state = torch.load(fname, map_location=self.device)
+    def load(self, weights: Path):
+        """
+        Carica il modello scelto.
+
+        :param weights:     percorso dei pesi da caricare.
+        :return:
+        """
+        model_state = torch.load(weights, map_location=self.device)
         self.model.load_state_dict(model_state["model"])
         self.model.to(self.device)
 
@@ -412,7 +417,7 @@ def main(args):
     NUM_WORKERS = args.num_workers
     LR = args.lr
     CHECKPOINT_DIR = Path(args.checkpoint_dir)
-    NUM_CLASSES = args.num_classes
+    WEIGHTS = Path(args.weights)
 
     assert MODE in ['train', 'eval'], '--mode deve essere uno tra "train" e "eval".'
     assert DEVICE in ['cuda', 'gpu'], '--device deve essere uno tra "cuda" e "gpu".'
@@ -455,6 +460,7 @@ def main(args):
             # ciclicamente uso uno split come val, reimposto le transforms a val_transforms nel caso fossero state
             # cambiate in precedenza
             val_ds = split  # split è il dataset che sto usando come validation
+            class_mapping = val_ds.mapping
             val_ds.set_transforms(val_transforms)
             val_loader = DataLoader(val_ds, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS)
 
@@ -466,7 +472,7 @@ def main(args):
             train_ds = Concat(train_datasets)
             train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
 
-            cls = Classifier(BACKBONE, DEVICE, actual_dir, NUM_CLASSES)      # inizializzo il classificatore
+            cls = Classifier(BACKBONE, DEVICE, actual_dir, class_mapping)      # inizializzo il classificatore
             train_result = cls.train(train_loader, val_loader, i, EPOCHS, LR)      # alleno
             best_results.append(train_result)
 
@@ -482,10 +488,11 @@ def main(args):
         actual_dir = CHECKPOINT_DIR
         # per creare il dataset non passo il parametro split perchè non serve (__init__ lo setta a n_folds)
         test_ds = MyDataset(ROOT, N_FOLDS, mode=MODE, transforms=val_transforms)
+        class_mapping = test_ds.mapping
         test_loader = DataLoader(test_ds, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS)
 
-        cls = Classifier(BACKBONE, DEVICE, actual_dir)  # inizializzo il classificatore
-        cls.load()
+        cls = Classifier(BACKBONE, DEVICE, actual_dir, class_mapping)  # inizializzo il classificatore
+        cls.load(WEIGHTS)
 
         test_accuracy = cls.test(test_loader)
         print(f'Accuracy sui dati di test: {test_accuracy}')
@@ -508,10 +515,9 @@ if __name__ == '__main__':
     parser.add_argument('--num-workers', type=int, default=3, help='Numero di worker.')
     parser.add_argument('--lr', type=float, default=0.001, help='Learning rate.')
     parser.add_argument('--checkpoint_dir', type=str, default='runs/classifier',
-                        help='Cartella dove salvare i risultati dei vari esperimenti. Se --mode == "train" specificare'
-                             ' la cartella madre che contiene tutte le annotazioni sugli esperimenti; se --mode =='
-                             ' "eval" indicare la cartella dello specifico esperimento che si vuole valutare.')
-    parser.add_argument('--num-classes', type=int, default=10, help='Numero di classi nel dataset.')
+                        help='Cartella dove salvare i risultati dei vari esperimenti.')
+    parser.add_argument('--weights', type=str, default='classifier.pth',
+                        help='Percorso dei pesi da usare per il classificatore.')
 
     arguments = parser.parse_args()
     main(arguments)
