@@ -247,11 +247,7 @@ class MoE(nn.Module):
             item_outputs = F.softmax(item_logits)  # class probabilities
             all_item_outputs += (item_outputs,)
 
-        item_logits = torch.vstack(all_item_logits)
-        print(item_logits.size())
-        item_outputs = torch.vstack(all_item_outputs)
-
-        return super_class_logits, super_class_outputs, item_logits, item_outputs
+        return super_class_logits, super_class_outputs, all_item_logits, all_item_outputs
 
 
 class Classifier:
