@@ -172,8 +172,7 @@ class Head(nn.Module):
 
     def forward(self, x):
         logits = self.layer1(x)  # output della rete prima di applicare softmax
-        outputs = F.softmax(logits, dim=1)  # class probabilities
-        return logits, outputs
+        return logits
 
 
 class MyResNet(ResNet):
@@ -209,6 +208,48 @@ def _resnet(block, layers, weights, progress, **kwargs) -> ResNet:
         model.load_state_dict(weights.get_state_dict(progress=progress))
 
     return model
+
+
+class MoE(nn.Module):
+    """
+    Il modulo è composto dalla resnet preallenata su imagenet e una lista di classification heads, una per ciascuna
+    classe.
+    """
+    def __init__(self, num_super_classes: int, len_item_classes: list):
+        """
+
+        :param num_super_classes:   numero delle super classi.
+        :param len_item_classes:    lista con il numero di prodotti per ciascuna super classe
+                                    -> len_item_classes[i] è il numero di prodotti della classe i.
+        """
+        super().__init__()
+        self.num_super_classes = num_super_classes
+        self.len_item_classes = len_item_classes
+        # carico la resnet (dovrebbe usare la mia implementazione modificata per restituire il feature vector)
+        self.resnet = resnet50(weights='DEFAULT', progress=True)
+        # congelo i parametri tranne quelli dell'ultimo bottleneck
+        blocks = list(self.resnet.children())
+        for b in blocks[:-3]:
+            for p in b.parameters():
+                p.requires_grad = False
+        # aggiungo il linear layer per la classificazione della super classe
+        self.resnet.fc = nn.Linear(2048, self.num_super_classes)
+        # creo un'istanza della classe Head() per ogni super classe e la aggiungo alla ModuleList
+        # la i-esima istanza ha come in_features la dimensione delle feature uscenti dalla resnet dopo flatten() (2048)
+        # e come classes il numero dei prodotti appartenenti alla i-esima super class
+        self.heads = nn.ModuleList([Head(2048, self.len_item_classes[i]) for i in range(self.num_super_classes)])
+
+    def forward(self, x):
+        # il metodo forward() di resnet è stato modificato per ritornare anche il feature vector
+        super_class_logits, feature_vector = self.resnet.forward(x)
+        super_class_outputs = F.softmax(super_class_logits, dim=1)  # class probabilities
+        super_class_decision = torch.argmax(super_class_outputs, dim=1).item()  # è già int
+
+        # seleziono la head e gli do in pasto il feature vector
+        item_logits = self.heads[super_class_decision].forward(feature_vector)
+        item_outputs = F.softmax(item_logits, dim=1)  # class probabilities
+
+        return super_class_logits, super_class_outputs, item_logits, item_outputs
 
 
 class Classifier:
@@ -251,15 +292,10 @@ class Classifier:
 
         else:
             # carico il modello pretrainato di resnet50 su imagenet
-            self.model = resnet50(weights='DEFAULT', progress=True)
-            # congelo i parametri per allenare solo il layer finale
-            for p in self.model.parameters():
-                p.requires_grad = False
-            # layer finale
-            self.model.fc = nn.Linear(2048, self.outputs)
+            self.model = MoE(self.num_super_classes, self.len_item_classes)
 
-        # stampa a schermo la rete
-        summary(self.model, input_size=(1, 3, 224, 224))
+        # # stampa a schermo la rete
+        # summary(self.model, input_size=(1, 3, 224, 224))
 
     def load(self, weights: Path):
         """
@@ -280,13 +316,16 @@ class Classifier:
         :return logits:     output prima della softmax (ci serve per calcolare la loss).
         :return outputs:    output della rete (class probabilities).
         """
+        if self.method == 'naive':
+            logits = self.model(x)      # output della rete prima di applicare softmax
+            outputs = F.softmax(logits, dim=1)      # class probabilities
 
-        logits = self.model(x)      # output della rete prima di applicare softmax
-        outputs = F.softmax(logits, dim=1)      # class probabilities
+            return logits, outputs
+        else:
+            # nel caso stia usando MoE ho già implementato il forward
+            return self.model.forward(x)
 
-        return logits, outputs
-
-    def train_one_epoch(self, dataloader, epoch, optimizer, criterion, writer):
+    def train_naive_one_epoch(self, dataloader, epoch, optimizer, criterion, writer):
         """
         Allena la rete per un'epoca.
 
@@ -306,7 +345,7 @@ class Classifier:
         epoch_correct = 0   # segno le prediction corrette della rete per poi calcolare l'accuracy
         tot_cases = 0       # counter dei casi totali (sarebbe la len(dataset_train))
         for sample in progress:
-            images, labels = sample             # __getitem__ restituisce una tupla (image, label)
+            images, _, labels = sample             # non mi interessa della super class
             images, labels = images.to(self.device), labels.to(self.device)
 
             batch_cases = images.shape[0]  # numero di sample nel batch
@@ -338,7 +377,7 @@ class Classifier:
         writer.add_scalar(f'Accuracy/Train', epoch_accuracy, epoch + 1)
 
     @torch.no_grad()
-    def validate(self, dataloader, epoch, criterion, writer):
+    def validate_naive(self, dataloader, epoch, criterion, writer):
         """
         Validazione della rete.
 
@@ -348,15 +387,15 @@ class Classifier:
         :param writer:      per salvare le metriche.
         :return:
         """
-        self.model.eval()   # passa in modalità eval
+        self.model.eval()  # passa in modalità eval
 
         n_batches = len(dataloader)
         progress = tqdm(dataloader, total=n_batches, leave=False, desc='EVAL')
-        epoch_loss = 0.0    # inizializzo la loss
-        epoch_correct = 0   # segno le prediction corrette della rete per poi calcolare l'accuracy
-        tot_cases = 0       # counter dei casi totali (sarebbe la len(dataset_val))
+        epoch_loss = 0.0  # inizializzo la loss
+        epoch_correct = 0  # segno le prediction corrette della rete per poi calcolare l'accuracy
+        tot_cases = 0  # counter dei casi totali (sarebbe la len(dataset_val))
         for sample in progress:
-            images, labels = sample         # __getitem__ restituisce una tupla (image, label)
+            images, _, labels = sample  # __getitem__ restituisce una tupla (image, label)
             images, labels = images.to(self.device), labels.to(self.device)
 
             batch_cases = images.shape[0]  # numero di sample nel batch
@@ -371,19 +410,23 @@ class Classifier:
             batch_loss = criterion(logits, labels)
 
             # accumulo le metriche di interesse
-            epoch_loss += batch_loss.item()    # avendo usato reduction='sum' nella loss qui sto sommando la loss totale
+            epoch_loss += batch_loss.item()  # avendo usato reduction='sum' nella loss qui sto sommando la loss totale
             batch_correct = torch.sum(batch_decisions == labels)  # risposte corrette per il batch attuale
-            epoch_correct += batch_correct.item()      # totale risposte corrette sull'epoca
+            epoch_correct += batch_correct.item()  # totale risposte corrette sull'epoca
 
-        epoch_mean_loss = epoch_loss / tot_cases        # loss media sull'epoca
-        epoch_accuracy = (epoch_correct / tot_cases) * 100.0        # accuracy sull'epoca (%)
+            postfix = {'batch_mean_loss': batch_loss.item() / batch_cases,
+                       'batch_accuracy': (batch_correct.item() / batch_cases) * 100.0}
+            progress.set_postfix(postfix)
+
+        epoch_mean_loss = epoch_loss / tot_cases  # loss media sull'epoca
+        epoch_accuracy = (epoch_correct / tot_cases) * 100.0  # accuracy sull'epoca (%)
         writer.add_scalar(f'Loss/Val', epoch_mean_loss, epoch + 1)
         writer.add_scalar(f'Accuracy/Val', epoch_accuracy, epoch + 1)
 
         return epoch_accuracy
 
     @torch.no_grad()
-    def test(self, dataloader):
+    def test_naive(self, dataloader):
         """
         Valuta l'accuratezza della rete sul dataset di test.
 
@@ -397,7 +440,7 @@ class Classifier:
         correct = 0  # segno le prediction corrette della rete per poi calcolare l'accuracy
         tot_cases = 0  # counter dei casi totali (sarebbe la len(dataset_test))
         for sample in progress:
-            images, labels = sample  # __getitem__ restituisce una tupla (image, label)
+            images, _, labels = sample  # __getitem__ restituisce una tupla (image, label)
             images, labels = images.to(self.device), labels.to(self.device)
 
             batch_cases = images.shape[0]  # numero di sample nel batch
@@ -414,6 +457,180 @@ class Classifier:
         accuracy = (correct / tot_cases) * 100.0  # accuracy sull'epoca (%)
 
         return accuracy
+
+    def train_moe_one_epoch(self, dataloader, epoch, optimizer, criterion, writer):
+        """
+        Allena la rete per un'epoca.
+
+        :param dataloader:  il dataloader del dataset di train.
+        :param epoch:       l'epoca attuale (serve solo per salvare le metriche nel summary writer).
+        :param optimizer:   per aggiornare i parametri.
+        :param criterion:   per la loss.
+        :param writer:      per salvare le metriche.
+        :return:
+        """
+        self.model.train()      # modalità train
+        optimizer.zero_grad()   # svuoto i gradienti
+
+        n_batches = len(dataloader)
+        progress = tqdm(dataloader, total=n_batches, leave=False, desc='EPOCH')
+        epoch_class_loss = 0.0    # inizializzo la loss delle superclassi
+        epoch_class_correct = 0   # prediction corrette della rete per calcolare l'accuracy sulle superclassi
+        epoch_item_loss = 0.0  # inizializzo la loss dei prodotti
+        epoch_item_correct = 0  # segno le prediction corrette della rete per poi calcolare l'accuracy sui prodotti
+        tot_cases = 0       # counter dei casi totali (sarebbe la len(dataset_train))
+        for sample in progress:
+            images, super_class_labels, item_labels = sample
+            images = images.to(self.device)
+            super_class_labels = super_class_labels.to(self.device)
+            item_labels = item_labels.to(self.device)
+
+            batch_cases = images.shape[0]  # numero di sample nel batch
+            tot_cases += batch_cases  # accumulo il numero totale di sample
+
+            # output della rete
+            super_class_logits, super_class_outputs, item_logits, item_outputs = self.forward(images)
+            # il risultato di softmax viene interpretato con politica winner takes all
+            batch_class_decisions = torch.argmax(super_class_outputs, dim=1)
+            batch_item_decisions = torch.argmax(item_outputs, dim=1)
+
+            # loss del batch e backward step
+            batch_class_loss = criterion(super_class_logits, super_class_labels)    # loss sulle classi
+            batch_item_loss = criterion(item_logits, item_labels)   # loss sui prodotti
+            # loss totale, aggiungo enfasi alla class loss perchè determina in cascata la possibilità di classificare
+            # corretttamente il prodotto
+            batch_total_loss = 2.0 * batch_class_loss + batch_item_loss
+            batch_total_loss.backward()
+            optimizer.step()
+            optimizer.zero_grad()
+
+            # accumulo le metriche di interesse
+            epoch_class_loss += batch_class_loss.item()
+            batch_class_correct = torch.sum(batch_class_decisions == super_class_labels)
+            epoch_class_correct += batch_class_correct.item()
+
+            epoch_item_loss += batch_item_loss.item()
+            # la classificazione del prodotto è corretta se lo era anche quella della super class
+            batch_item_correct = torch.sum((batch_class_decisions == super_class_labels) and (batch_item_decisions == item_labels))
+            epoch_item_correct += batch_item_correct.item()
+
+            postfix = {'batch_mean_class_loss': batch_class_loss.item()/batch_cases,
+                       'batch_class_accuracy': batch_class_correct.item()/batch_cases,
+                       'batch_mean_item_loss': batch_item_loss.item() / batch_cases,
+                       'batch_item_accuracy': batch_item_correct.item() / batch_cases}
+            progress.set_postfix(postfix)
+
+        epoch_mean_class_loss = epoch_class_loss / tot_cases        # loss media sull'epoca
+        epoch_mean_item_loss = epoch_item_loss / tot_cases  # loss media sull'epoca
+        epoch_class_accuracy = (epoch_class_correct / tot_cases) * 100.0        # accuracy sull'epoca (%)
+        epoch_item_accuracy = (epoch_item_correct / tot_cases) * 100.0  # accuracy sull'epoca (%)
+        writer.add_scalar(f'Class Loss/Train', epoch_mean_class_loss, epoch + 1)
+        writer.add_scalar(f'Class Accuracy/Train', epoch_class_accuracy, epoch + 1)
+        writer.add_scalar(f'Item Loss/Train', epoch_mean_item_loss, epoch + 1)
+        writer.add_scalar(f'Item Accuracy/Train', epoch_item_accuracy, epoch + 1)
+
+    @torch.no_grad()
+    def validate_moe(self, dataloader, epoch, criterion, writer):
+        """
+        Validazione della rete.
+
+        :param dataloader:  il dataloader del dataset di validation.
+        :param epoch:       l'epoca attuale (serve solo per salvare le metriche nel summary writer).
+        :param criterion:   per la loss.
+        :param writer:      per salvare le metriche.
+        :return:
+        """
+        self.model.eval()  # passa in modalità eval
+
+        n_batches = len(dataloader)
+        progress = tqdm(dataloader, total=n_batches, leave=False, desc='EPOCH')
+        epoch_class_loss = 0.0  # inizializzo la loss delle superclassi
+        epoch_class_correct = 0  # prediction corrette della rete per calcolare l'accuracy sulle superclassi
+        epoch_item_loss = 0.0  # inizializzo la loss dei prodotti
+        epoch_item_correct = 0  # segno le prediction corrette della rete per poi calcolare l'accuracy sui prodotti
+        tot_cases = 0  # counter dei casi totali (sarebbe la len(dataset_train))
+        for sample in progress:
+            images, super_class_labels, item_labels = sample
+            images = images.to(self.device)
+            super_class_labels = super_class_labels.to(self.device)
+            item_labels = item_labels.to(self.device)
+
+            batch_cases = images.shape[0]  # numero di sample nel batch
+            tot_cases += batch_cases  # accumulo il numero totale di sample
+
+            # output della rete
+            super_class_logits, super_class_outputs, item_logits, item_outputs = self.forward(images)
+            # il risultato di softmax viene interpretato con politica winner takes all
+            batch_class_decisions = torch.argmax(super_class_outputs, dim=1)
+            batch_item_decisions = torch.argmax(item_outputs, dim=1)
+
+            # loss del batch e backward step
+            batch_class_loss = criterion(super_class_logits, super_class_labels)  # loss sulle classi
+            batch_item_loss = criterion(item_logits, item_labels)  # loss sui prodotti
+
+            # accumulo le metriche di interesse
+            epoch_class_loss += batch_class_loss.item()
+            batch_class_correct = torch.sum(batch_class_decisions == super_class_labels)
+            epoch_class_correct += batch_class_correct.item()
+
+            epoch_item_loss += batch_item_loss.item()
+            batch_item_correct = torch.sum((batch_class_decisions == super_class_labels) and (batch_item_decisions == item_labels))
+            epoch_item_correct += batch_item_correct.item()
+
+            postfix = {'batch_mean_class_loss': batch_class_loss.item() / batch_cases,
+                       'batch_class_accuracy': batch_class_correct.item() / batch_cases,
+                       'batch_mean_item_loss': batch_item_loss.item() / batch_cases,
+                       'batch_item_accuracy': batch_item_correct.item() / batch_cases}
+            progress.set_postfix(postfix)
+
+        epoch_mean_class_loss = epoch_class_loss / tot_cases  # loss media sull'epoca
+        epoch_mean_item_loss = epoch_item_loss / tot_cases  # loss media sull'epoca
+        epoch_class_accuracy = (epoch_class_correct / tot_cases) * 100.0  # accuracy sull'epoca (%)
+        epoch_item_accuracy = (epoch_item_correct / tot_cases) * 100.0  # accuracy sull'epoca (%)
+        writer.add_scalar(f'Class Loss/Val', epoch_mean_class_loss, epoch + 1)
+        writer.add_scalar(f'Class Accuracy/Val', epoch_class_accuracy, epoch + 1)
+        writer.add_scalar(f'Item Loss/Val', epoch_mean_item_loss, epoch + 1)
+        writer.add_scalar(f'Item Accuracy/Val', epoch_item_accuracy, epoch + 1)
+
+        return epoch_class_accuracy, epoch_item_accuracy
+
+    @torch.no_grad()
+    def test_moe(self, dataloader):
+        """
+        Valuta l'accuratezza della rete sul dataset di test.
+
+        :param dataloader:  il dataloader del dataset di test.
+        :return:
+        """
+        self.model.eval()  # passa in modalità eval
+
+        n_batches = len(dataloader)
+        progress = tqdm(dataloader, total=n_batches, leave=False, desc='EPOCH')
+        class_correct = 0  # prediction corrette della rete per calcolare l'accuracy sulle superclassi
+        item_correct = 0  # segno le prediction corrette della rete per poi calcolare l'accuracy sui prodotti
+        tot_cases = 0  # counter dei casi totali (sarebbe la len(dataset_train))
+        for sample in progress:
+            images, super_class_labels, item_labels = sample
+            images = images.to(self.device)
+            super_class_labels = super_class_labels.to(self.device)
+            item_labels = item_labels.to(self.device)
+
+            batch_cases = images.shape[0]  # numero di sample nel batch
+            tot_cases += batch_cases  # accumulo il numero totale di sample
+
+            # outputs della rete
+            super_class_logits, super_class_outputs, item_logits, item_outputs = self.forward(images)
+            # il risultato di softmax viene interpretato con politica winner takes all
+            batch_class_decisions = torch.argmax(super_class_outputs, dim=1)
+            batch_item_decisions = torch.argmax(item_outputs, dim=1)
+
+            # conto le risposte corrette
+            class_correct += torch.sum(batch_class_decisions == super_class_labels)  # totale risposte corrette
+            item_correct += torch.sum((batch_class_decisions == super_class_labels) and (batch_item_decisions == item_labels))
+        class_accuracy = (class_correct / tot_cases) * 100.0  # accuracy sull'epoca (%)
+        item_accuracy = (item_correct / tot_cases) * 100.0
+
+        return class_accuracy, item_accuracy
 
     def train(self, train_loader: DataLoader, val_loader: DataLoader, split: int, epochs: int, lr: float):
         """
@@ -437,28 +654,55 @@ class Classifier:
         writer = SummaryWriter(log_dir=str(ckpt_dir))
 
         # inizializzo per scegliere il modello migliore
-        best_acc = 0.0
-        for epoch in progress:
-            # train
+        if self.method == 'naive':
+            best_acc = 0.0
+            for epoch in progress:
+                # train
 
-            # alleno la rete su tutti gli esempi del train set (1 epoca)
-            self.train_one_epoch(train_loader, epoch, optimizer, criterion, writer)
-            # valido il modello attuale sul validation set e ottengo l'accuratezza attuale
-            acc_now = self.validate(val_loader, epoch, criterion, writer)
-            # scelgo il modello migliore e lo salvo
-            if acc_now > best_acc:
-                best_acc = acc_now
-                best_epoch = epoch + 1
+                # alleno la rete su tutti gli esempi del train set (1 epoca)
+                self.train_naive_one_epoch(train_loader, epoch, optimizer, criterion, writer)
+                # valido il modello attuale sul validation set e ottengo l'accuratezza attuale
+                acc_now = self.validate_naive(val_loader, epoch, criterion, writer)
+                # scelgo il modello migliore e lo salvo
+                if acc_now > best_acc:
+                    best_acc = acc_now
+                    best_epoch = epoch + 1
 
-                torch.save({
-                    'model': self.model.state_dict(),
-                    'optimizer': optimizer.state_dict(),
-                    'epoch': best_epoch,
-                    'accuracy': best_acc,
-                }, f=ckpt_dir / 'classifier.pth')
+                    torch.save({
+                        'model': self.model.state_dict(),
+                        'optimizer': optimizer.state_dict(),
+                        'epoch': best_epoch,
+                        'accuracy': best_acc,
+                    }, f=ckpt_dir / 'classifier.pth')
 
-        # restituiso le metriche per stamparle e fare la media sui fold
-        best_metrics = {'epoch': best_epoch, 'accuracy': best_acc}
+            # restituiso le metriche per stamparle e fare la media sui fold
+            best_metrics = {'epoch': best_epoch, 'accuracy': best_acc}
+        else:
+            best_class_acc = 0.0
+            best_item_acc = 0.0
+            for epoch in progress:
+                # train
+
+                # alleno la rete su tutti gli esempi del train set (1 epoca)
+                self.train_moe_one_epoch(train_loader, epoch, optimizer, criterion, writer)
+                # valido il modello attuale sul validation set e ottengo l'accuratezza attuale
+                class_acc_now, item_acc_now = self.validate_moe(val_loader, epoch, criterion, writer)
+                # scelgo il modello migliore e lo salvo
+                if class_acc_now > best_class_acc and item_acc_now > best_item_acc:
+                    best_class_acc = class_acc_now
+                    best_item_acc = item_acc_now
+                    best_epoch = epoch + 1
+
+                    torch.save({
+                        'model': self.model.state_dict(),
+                        'optimizer': optimizer.state_dict(),
+                        'epoch': best_epoch,
+                        'class_accuracy': best_class_acc,
+                        'item_accuracy': best_item_acc
+                    }, f=ckpt_dir / 'classifier.pth')
+
+            # restituisco le metriche per stamparle e fare la media sui fold
+            best_metrics = {'epoch': best_epoch, 'class_accuracy': best_class_acc, 'item_accuracy': best_item_acc}
 
         return best_metrics
 
@@ -473,15 +717,14 @@ def main(args):
     NUM_WORKERS = args.num_workers
     LR = args.lr
     CHECKPOINT_DIR = Path(args.checkpoint_dir)
-    NUM_CLASSES = args.num_classes
     METHOD = args.method
     WEIGHTS = Path(args.weights)
 
     assert MODE in ['train', 'eval'], '--mode deve essere uno tra "train" e "eval".'
     assert DEVICE in ['cuda', 'gpu'], '--device deve essere uno tra "cuda" e "gpu".'
     assert METHOD in ['naive', 'moe'], 'scegliere --head "naive" se si vuole semplicemente avere tanti output neurons' \
-                                     ' quanti sono gli oggetti oppure "moe" per usare un ensemble di classificatori' \
-                                     ' specifici ciascuno per ogni categoria merceologica.'
+                                       ' quanti sono gli oggetti oppure "moe" per usare un ensemble di classificatori' \
+                                       ' specifici ciascuno per ogni categoria merceologica.'
 
     train_transforms = transforms.Compose([transforms.ToTensor(),
                                            transforms.RandomAffine(45, translate=(0.1, 0.1),
@@ -509,6 +752,7 @@ def main(args):
             # ciclicamente uso uno split come val, reimposto le transforms a val_transforms nel caso fossero state
             # cambiate in precedenza
             val_ds = split  # split è il dataset che sto usando come validation
+            class_mapping = val_ds.mapping
             val_ds.set_transforms(val_transforms)
             val_loader = DataLoader(val_ds, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS)
 
@@ -520,15 +764,23 @@ def main(args):
             train_ds = Concat(train_datasets)
             train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
 
-            cls = Classifier(BACKBONE, DEVICE, actual_dir)      # inizializzo il classificatore
+            cls = Classifier(METHOD, DEVICE, actual_dir, class_mapping, WEIGHTS)      # inizializzo il classificatore
             train_result = cls.train(train_loader, val_loader, i, EPOCHS, LR)      # alleno
             best_results.append(train_result)
 
-        accuracies = [r["accuracy"] for r in best_results]  # elenco le best_accuracy di ogni fold per farne la media
-        mean_accuracy = np.mean(accuracies)
         for i, r in enumerate(best_results):
             print(f'Fold {i+1}: miglior accuratezza raggiunta dopo {r["epoch"]} epoche pari al {r["accuracy"]}%.')
-        print(f'Accuracy media: {mean_accuracy}')
+        if METHOD == 'naive':
+            accuracies = [r["accuracy"] for r in best_results]  # elenco le best_accuracy di ogni fold per la media
+            mean_accuracy = np.mean(accuracies)
+            print(f'Accuracy media: {mean_accuracy}')
+        else:
+            class_accuracies = [r["class_accuracy"] for r in best_results]
+            mean_class_accuracy = np.mean(class_accuracies)
+            print(f'Class accuracy media: {mean_class_accuracy}')
+            item_accuracies = [r["item_accuracy"] for r in best_results]
+            mean_item_accuracy = np.mean(item_accuracies)
+            print(f'Item accuracy media: {mean_item_accuracy}')
 
     else:
         # a questo giro deve essere il percorso completo alla cartella in cui sono stati salvati i progressi
@@ -536,13 +788,19 @@ def main(args):
         actual_dir = CHECKPOINT_DIR
         # per creare il dataset non passo il parametro split perchè non serve (__init__ lo setta a n_folds)
         test_ds = MyDataset(ROOT, N_FOLDS, mode=MODE, transforms=val_transforms)
+        class_mapping = test_ds.mapping
         test_loader = DataLoader(test_ds, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS)
 
-        cls = Classifier(BACKBONE, DEVICE, actual_dir)  # inizializzo il classificatore
-        cls.load()
+        cls = Classifier(METHOD, DEVICE, actual_dir, class_mapping, WEIGHTS)  # inizializzo il classificatore
+        cls.load(WEIGHTS)
 
-        test_accuracy = cls.test(test_loader)
-        print(f'Accuracy sui dati di test: {test_accuracy}')
+        if METHOD == 'naive':
+            test_accuracy = cls.test_naive(test_loader)
+            print(f'Accuracy sui dati di test: {test_accuracy}')
+        else:
+            class_accuracy, item_accuracy = cls.test_moe(test_loader)
+            print(f'Class accuracy sui dati di test: {class_accuracy}')
+            print(f'Item accuracy sui dati di test: {item_accuracy}')
 
 
 if __name__ == '__main__':
@@ -563,7 +821,6 @@ if __name__ == '__main__':
                         help='Cartella dove salvare i risultati dei vari esperimenti. Se --mode == "train" specificare'
                              ' la cartella madre che contiene tutte le annotazioni sugli esperimenti; se --mode =='
                              ' "eval" indicare la cartella dello specifico esperimento che si vuole valutare.')
-    parser.add_argument('--num-classes', type=int, default=10, help='Numero di classi nel dataset.')
     parser.add_argument('--method', type=str, default='moe',
                         help='Scegliere se usare un approccio "naive" (#neuroni_out == #classi) o "moe"'
                              ' (mixture of experts). Il metodo naive carica il classificatore ottenuto al passo'
