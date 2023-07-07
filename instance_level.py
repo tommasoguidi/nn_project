@@ -193,7 +193,7 @@ class MyResNet(ResNet):
         feature_vector = torch.flatten(x, 1)
         x = self.fc(feature_vector)
 
-        return x, feature_vector
+        return x
 
 
 def _resnet(block, layers, weights, progress, **kwargs) -> ResNet:
