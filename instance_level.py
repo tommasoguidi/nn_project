@@ -236,16 +236,16 @@ class MoE(nn.Module):
         super_class_outputs = F.softmax(super_class_logits, dim=1)  # class probabilities
         super_class_decision = torch.argmax(super_class_outputs, dim=1)  # questo è un tensore di dimensione batch_size
         # ciclo su ogni risultato e lo indirizzo alla testa giusta
-        all_item_logits = []
-        all_item_outputs = []
+        all_item_logits = ()
+        all_item_outputs = ()
         for i, decision in enumerate(super_class_decision):
             # prendo una per una le encoding delle immagini
             feature_encoding = feature_vectors[i]
             # la indirizzo alla testa scelta da decision
             item_logits = self.heads[decision.item()].forward(feature_encoding)
-            all_item_logits.append(item_logits)
+            all_item_logits += item_logits
             item_outputs = F.softmax(item_logits)  # class probabilities
-            all_item_outputs.append(item_outputs)
+            all_item_outputs += item_outputs
 
         item_logits = torch.cat(item_logits)
         item_outputs = torch.cat(item_outputs)
