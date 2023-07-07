@@ -339,6 +339,8 @@ class Classifier:
         self.model.train()      # modalità train
         optimizer.zero_grad()   # svuoto i gradienti
 
+        print(next(self.model.parameters()).device)
+
         n_batches = len(dataloader)
         progress = tqdm(dataloader, total=n_batches, leave=False, desc='EPOCH')
         epoch_loss = 0.0    # inizializzo la loss
