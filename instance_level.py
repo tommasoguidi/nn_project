@@ -175,39 +175,37 @@ class Head(nn.Module):
         return logits
 
 
-class MyResNet(ResNet):
+class MyResNet(nn.Module):
     """Riscrivo il forward della ResNet originaria per prelevare il vettore delle features"""
-    def _forward_impl(self, x: torch.Tensor):
+    def __init__(self, num_super_classes):
+        super().__init__()
+        # carico la resnet
+        self.resnet = resnet50(weights='DEFAULT', progress=True)
+        # congelo i parametri tranne quelli dell'ultimo bottleneck
+        blocks = list(self.resnet.children())
+        for b in blocks[:-3]:
+            for p in b.parameters():
+                p.requires_grad = False
+        # modifico il linear layer per la classificazione della super classe
+        self.resnet.fc = nn.Linear(2048, num_super_classes)
+
+    def forward(self, x):
         # implementazione ufficiale pytorch del forward, modificata per ritornare il feature vector
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.relu(x)
-        x = self.maxpool(x)
+        x = self.resnet.conv1(x)
+        x = self.resnet.bn1(x)
+        x = self.resnet.relu(x)
+        x = self.resnet.maxpool(x)
 
-        x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
-        x = self.layer4(x)
+        x = self.resnet.layer1(x)
+        x = self.resnet.layer2(x)
+        x = self.resnet.layer3(x)
+        x = self.resnet.layer4(x)
 
-        x = self.avgpool(x)
+        x = self.resnet.avgpool(x)
         feature_vector = torch.flatten(x, 1)
-        x = self.fc(feature_vector)
+        x = self.resnet.fc(feature_vector)
 
         return x, feature_vector
-
-
-def _resnet(block, layers, weights, progress, **kwargs) -> ResNet:
-    """Questo è il metodo utilizzato per costruire la ResNet."""
-    if weights is not None:
-        _ovewrite_named_param(kwargs, "num_classes", len(weights.meta["categories"]))
-
-    # uso la resnet modificata sopra
-    model = MyResNet(block, layers, **kwargs)
-
-    if weights is not None:
-        model.load_state_dict(weights.get_state_dict(progress=progress))
-
-    return model
 
 
 class MoE(nn.Module):
@@ -225,15 +223,8 @@ class MoE(nn.Module):
         super().__init__()
         self.num_super_classes = num_super_classes
         self.len_item_classes = len_item_classes
-        # carico la resnet (dovrebbe usare la mia implementazione modificata per restituire il feature vector)
-        self.resnet = resnet50(weights='DEFAULT', progress=True)
-        # congelo i parametri tranne quelli dell'ultimo bottleneck
-        blocks = list(self.resnet.children())
-        for b in blocks[:-3]:
-            for p in b.parameters():
-                p.requires_grad = False
-        # aggiungo il linear layer per la classificazione della super classe
-        self.resnet.fc = nn.Linear(2048, self.num_super_classes)
+        # metto la mia resnet con forward modificato
+        self.resnet = MyResNet(num_super_classes=self.num_super_classes)
         # creo un'istanza della classe Head() per ogni super classe e la aggiungo alla ModuleList
         # la i-esima istanza ha come in_features la dimensione delle feature uscenti dalla resnet dopo flatten() (2048)
         # e come classes il numero dei prodotti appartenenti alla i-esima super class
@@ -241,14 +232,13 @@ class MoE(nn.Module):
 
     def forward(self, x):
         # il metodo forward() di resnet è stato modificato per ritornare anche il feature vector
-        super_class_logits = self.resnet.forward(x)
-        print(super_class_logits.size())
+        super_class_logits, feature_vector = self.resnet.forward(x)
         super_class_outputs = F.softmax(super_class_logits, dim=1)  # class probabilities
         super_class_decision = torch.argmax(super_class_outputs, dim=1).item()  # è già int
 
         # seleziono la head e gli do in pasto il feature vector
-        # item_logits = self.heads[super_class_decision].forward(feature_vector)
-        # item_outputs = F.softmax(item_logits, dim=1)  # class probabilities
+        item_logits = self.heads[super_class_decision].forward(feature_vector)
+        item_outputs = F.softmax(item_logits, dim=1)  # class probabilities
 
         return super_class_logits, super_class_outputs
 
