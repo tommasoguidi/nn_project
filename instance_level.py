@@ -243,9 +243,9 @@ class MoE(nn.Module):
             feature_encoding = feature_vectors[i]
             # la indirizzo alla testa scelta da decision
             item_logits = self.heads[decision.item()].forward(feature_encoding)
-            all_item_logits += item_logits
+            all_item_logits += (item_logits,)
             item_outputs = F.softmax(item_logits)  # class probabilities
-            all_item_outputs += item_outputs
+            all_item_outputs += (item_outputs,)
 
         item_logits = torch.cat(item_logits)
         item_outputs = torch.cat(item_outputs)
