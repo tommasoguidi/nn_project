@@ -49,8 +49,8 @@ class MyDataset(Dataset):
         # QUI CAMBIA RISPETTO A PRIMA PERCHE' LE CLASSI DIVENTANO I PRODUCT_ID UNIVOCI PER OGNI PRODOTTO
         #
         #
-        self.all_classes = self.annos['product_type'].unique().tolist()   # tutte le classi del dataset
-        self.all_super_classes = sorted(self.annos['item_id'].unique().tolist())     # classi del caso semplice
+        self.all_classes = self.annos['item_id'].unique().tolist()   # tutte le classi del dataset
+        self.all_super_classes = sorted(self.annos['product_type'].unique().tolist())     # classi del caso semplice
         self.mapping = {}
         for i, super_class in enumerate(self.all_super_classes):
             # tutte le righe del dataframe relative ad una categoria merceologica
@@ -806,7 +806,7 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Train del classificatore',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--root', type=str, default=r'C:\Users\rx571gt-b034t\Desktop\PROJECT\subset',
+    parser.add_argument('--root', type=str, default=r'C:\Users\rx571gt-b034t\Desktop\PROJECT\subset_10',
                         help='Root del dataset.')
     parser.add_argument('--n-folds', type=int, default=3, help='Numero di fold per la cross validation')
     parser.add_argument('-m', '--mode', type=str, default='train',
