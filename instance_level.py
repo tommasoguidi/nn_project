@@ -193,7 +193,7 @@ class MyResNet(ResNet):
         feature_vector = torch.flatten(x, 1)
         x = self.fc(feature_vector)
 
-        return x
+        return x, feature_vector
 
 
 def _resnet(block, layers, weights, progress, **kwargs) -> ResNet:
@@ -241,15 +241,16 @@ class MoE(nn.Module):
 
     def forward(self, x):
         # il metodo forward() di resnet è stato modificato per ritornare anche il feature vector
-        super_class_logits, feature_vector = self.resnet.forward(x)
+        super_class_logits = self.resnet.forward(x)
+        print(super_class_logits)
         super_class_outputs = F.softmax(super_class_logits, dim=1)  # class probabilities
         super_class_decision = torch.argmax(super_class_outputs, dim=1).item()  # è già int
 
         # seleziono la head e gli do in pasto il feature vector
-        item_logits = self.heads[super_class_decision].forward(feature_vector)
-        item_outputs = F.softmax(item_logits, dim=1)  # class probabilities
+        # item_logits = self.heads[super_class_decision].forward(feature_vector)
+        # item_outputs = F.softmax(item_logits, dim=1)  # class probabilities
 
-        return super_class_logits, super_class_outputs, item_logits, item_outputs
+        return super_class_logits, super_class_outputs
 
 
 class Classifier:
