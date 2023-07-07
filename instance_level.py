@@ -339,8 +339,6 @@ class Classifier:
         self.model.train()      # modalità train
         optimizer.zero_grad()   # svuoto i gradienti
 
-        print(next(self.model.parameters()).device)
-
         n_batches = len(dataloader)
         progress = tqdm(dataloader, total=n_batches, leave=False, desc='EPOCH')
         epoch_loss = 0.0    # inizializzo la loss
@@ -349,6 +347,7 @@ class Classifier:
         for sample in progress:
             images, _, labels = sample             # non mi interessa della super class
             images, labels = images.to(self.device), labels.to(self.device)
+            print(images.is_cuda, labels.is_cuda)
 
             batch_cases = images.shape[0]  # numero di sample nel batch
             tot_cases += batch_cases  # accumulo il numero totale di sample
