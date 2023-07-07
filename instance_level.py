@@ -242,7 +242,7 @@ class MoE(nn.Module):
     def forward(self, x):
         # il metodo forward() di resnet è stato modificato per ritornare anche il feature vector
         super_class_logits = self.resnet.forward(x)
-        print(super_class_logits)
+        print(super_class_logits.size())
         super_class_outputs = F.softmax(super_class_logits, dim=1)  # class probabilities
         super_class_decision = torch.argmax(super_class_outputs, dim=1).item()  # è già int
 
