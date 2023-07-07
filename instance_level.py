@@ -105,7 +105,7 @@ class MyDataset(Dataset):
         ids_in_split = []
         for _class in self.all_classes:
             # metto in una lista tutte gli image_id di una determinata classe
-            ids_in_class = self.annos.index[self.annos['product_type'] == _class].tolist()
+            ids_in_class = self.annos.index[self.annos['item_id'] == _class].tolist()
             # splitto in n_folds + 1 per avere un hold out su cui fare il test (l'ultimo degli split)
             ids_per_split = len(ids_in_class) // (self.n_folds + 1)     # n di immagini che metto nello split
             # se siamo in train mode self.split è scandito dal loop del kfold 0,1,...,k
