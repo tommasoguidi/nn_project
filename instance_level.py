@@ -90,7 +90,7 @@ class MyDataset(Dataset):
         super_class_label = self.annos.loc[image_id, 'product_type']
         item_label = self.annos.loc[image_id, 'item_id']
         super_class_label = torch.tensor(self.mapping[super_class_label]['identifier'], dtype=torch.long)
-        item_label = torch.tensor(self.mapping[super_class_label][item_label], dtype=torch.long)
+        item_label = torch.tensor(self.mapping[super_class_label.item()][item_label], dtype=torch.long)
 
         return image, super_class_label, item_label
 
