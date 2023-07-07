@@ -34,7 +34,7 @@ class MyDataset(Dataset):
         """
         self.path = path
         self.img_dir = path / 'images'
-        self.annos = pd.read_csv(path / 'subset_images.csv', index_col='image_id')  # leggo il csv con pandas
+        self.annos = pd.read_csv(path / 'subset_10_images.csv', index_col='image_id')  # leggo il csv con pandas
         self.n_folds = n_folds
         self.split = split
         self.mode = mode
@@ -49,12 +49,12 @@ class MyDataset(Dataset):
         # QUI CAMBIA RISPETTO A PRIMA PERCHE' LE CLASSI DIVENTANO I PRODUCT_ID UNIVOCI PER OGNI PRODOTTO
         #
         #
-        self.all_classes = self.annos['product_id'].unique().tolist()   # tutte le classi del dataset
+        self.all_classes = self.annos['product_type'].unique().tolist()   # tutte le classi del dataset
         self.all_super_classes = sorted(self.annos['item_id'].unique().tolist())     # classi del caso semplice
         self.mapping = {}
         for i, super_class in enumerate(self.all_super_classes):
             # tutte le righe del dataframe relative ad una categoria merceologica
-            _listings_in_superclass = self.annos[self.annos['product_id'] == super_class]
+            _listings_in_superclass = self.annos[self.annos['product_type'] == super_class]
             # lista degli item_id univoci della superclass (metterli in ordine ovviamente non cambia niente)
             _items_in_superclass = sorted(_listings_in_superclass['item_id'].unique().tolist())
             # identifier sarà l'int che identifica la superclass i
@@ -105,7 +105,7 @@ class MyDataset(Dataset):
         ids_in_split = []
         for _class in self.all_classes:
             # metto in una lista tutte gli image_id di una determinata classe
-            ids_in_class = self.annos.index[self.annos['product_id'] == _class].tolist()
+            ids_in_class = self.annos.index[self.annos['product_type'] == _class].tolist()
             # splitto in n_folds + 1 per avere un hold out su cui fare il test (l'ultimo degli split)
             ids_per_split = len(ids_in_class) // (self.n_folds + 1)     # n di immagini che metto nello split
             # se siamo in train mode self.split è scandito dal loop del kfold 0,1,...,k
