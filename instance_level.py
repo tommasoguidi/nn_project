@@ -489,33 +489,50 @@ class Classifier:
 
             # output della rete
             super_class_logits, super_class_outputs, item_logits, item_outputs = self.forward(images)
-            # il risultato di softmax viene interpretato con politica winner takes all
-            batch_class_decisions = torch.argmax(super_class_outputs, dim=1)
-            batch_item_decisions = torch.argmax(item_outputs, dim=1)
+            # adesso il problema è che per ogni esempio l'architettura della rete cambia, quindi per aggiornare i
+            # gradienti non mi viene in mente altro che ciclare sui vari esempi, facendo lo step alla fine del ciclo
+            # in modo da preservare la batch_mode
+            batch_class_decisions = []
+            batch_item_decisions = []
+            batch_class_loss = 0.0
+            batch_item_loss = 0.0
+            for c_l, c_o, i_l, i_o, c_lbl, i_lbl in zip(super_class_logits, super_class_outputs, item_logits,
+                                                        item_outputs, super_class_labels, item_labels):
+                # il risultato di softmax viene interpretato con politica winner takes all
+                _class_decision = torch.argmax(c_o)   # adesso l'argomento è un vettore, non un batch
+                batch_class_decisions.append(_class_decision)
+                _item_decisions = torch.argmax(i_o)
+                batch_item_decisions.append(_item_decisions)
 
-            # loss del batch e backward step
-            batch_class_loss = criterion(super_class_logits, super_class_labels)    # loss sulle classi
-            batch_item_loss = criterion(item_logits, item_labels)   # loss sui prodotti
-            # loss totale, aggiungo enfasi alla class loss perchè determina in cascata la possibilità di classificare
-            # corretttamente il prodotto
-            batch_total_loss = 2.0 * batch_class_loss + batch_item_loss
-            batch_total_loss.backward()
+                # loss del batch e backward step
+                _class_loss = criterion(c_l, c_lbl)    # loss sulle classi
+                batch_class_loss += _class_loss
+                _item_loss = criterion(i_l, i_lbl)   # loss sui prodotti
+                batch_item_loss += _item_loss
+                # loss totale, aggiungo enfasi alla class loss perchè determina in cascata la possibilità
+                # di classificare corretttamente il prodotto
+                _total_loss = 2.0 * _class_loss + _item_loss
+                _total_loss.backward()
             optimizer.step()
             optimizer.zero_grad()
 
+            # trasformo in tensori le liste in cui ho accumulato le varie loss
+            batch_class_decisions = torch.tensor(batch_class_decisions, device=self.device)
+            batch_item_decisions = torch.tensor(batch_item_decisions, device=self.device)
+
             # accumulo le metriche di interesse
-            epoch_class_loss += batch_class_loss.item()
+            epoch_class_loss += batch_class_loss
             batch_class_correct = torch.sum(batch_class_decisions == super_class_labels)
             epoch_class_correct += batch_class_correct.item()
 
-            epoch_item_loss += batch_item_loss.item()
+            epoch_item_loss += batch_item_loss
             # la classificazione del prodotto è corretta se lo era anche quella della super class
             batch_item_correct = torch.sum((batch_class_decisions == super_class_labels) and (batch_item_decisions == item_labels))
             epoch_item_correct += batch_item_correct.item()
 
-            postfix = {'batch_mean_class_loss': batch_class_loss.item()/batch_cases,
+            postfix = {'batch_mean_class_loss': batch_class_loss/batch_cases,
                        'batch_class_accuracy': batch_class_correct.item()/batch_cases,
-                       'batch_mean_item_loss': batch_item_loss.item() / batch_cases,
+                       'batch_mean_item_loss': batch_item_loss / batch_cases,
                        'batch_item_accuracy': batch_item_correct.item() / batch_cases}
             progress.set_postfix(postfix)
 
