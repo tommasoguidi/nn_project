@@ -510,7 +510,7 @@ class Classifier:
                 batch_item_loss += item_loss
                 # loss totale, aggiungo enfasi alla class loss perchè determina in cascata la possibilità
                 # di classificare corretttamente il prodotto
-                total_loss = 2.0 * super_class_loss + item_loss
+                total_loss = super_class_loss + item_loss
                 total_loss.backward()
             # aggiorno i pesi
             optimizer.step()
