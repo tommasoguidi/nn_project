@@ -479,40 +479,40 @@ class Classifier:
         epoch_item_correct = 0  # segno le prediction corrette della rete per poi calcolare l'accuracy sui prodotti
         tot_cases = 0       # counter dei casi totali (sarebbe la len(dataset_train))
         for sample in progress:
-            images, super_class_labels, item_labels = sample
-            images = images.to(self.device)
-            super_class_labels = super_class_labels.to(self.device)
-            item_labels = item_labels.to(self.device)
-
-            batch_cases = images.shape[0]  # numero di sample nel batch
-            tot_cases += batch_cases  # accumulo il numero totale di sample
-
-            # output della rete
-            super_class_logits, super_class_outputs, item_logits, item_outputs = self.forward(images)
-            # adesso il problema è che per ogni esempio l'architettura della rete cambia, quindi per aggiornare i
-            # gradienti non mi viene in mente altro che ciclare sui vari esempi, facendo lo step alla fine del ciclo
-            # in modo da preservare la batch_mode
             batch_class_decisions = []
             batch_item_decisions = []
             batch_class_loss = 0.0
             batch_item_loss = 0.0
-            for c_l, c_o, i_l, i_o, c_lbl, i_lbl in zip(super_class_logits, super_class_outputs, item_logits,
-                                                        item_outputs, super_class_labels, item_labels):
+
+            images, super_class_labels, item_labels = sample
+            batch_cases = images.shape[0]  # numero di sample nel batch
+            tot_cases += batch_cases  # accumulo il numero totale di esempi
+            # adesso il problema è che per ogni esempio l'architettura della rete cambia, quindi per aggiornare i
+            # gradienti non mi viene in mente altro che ciclare sui vari esempi, facendo lo step alla fine del ciclo
+            # in modo da preservare la batch_mode
+            for image, super_class_label, item_label in zip(images, super_class_labels, item_labels):
+                image = image.to(self.device)
+                super_class_label = super_class_label.to(self.device)
+                item_label = item_label.to(self.device)
+                # output della rete
+                super_class_logit, super_class_output, item_logit, item_output = self.forward(image)
+
                 # il risultato di softmax viene interpretato con politica winner takes all
-                _class_decision = torch.argmax(c_o)   # adesso l'argomento è un vettore, non un batch
-                batch_class_decisions.append(_class_decision)
-                _item_decisions = torch.argmax(i_o)
-                batch_item_decisions.append(_item_decisions)
+                super_class_decision = torch.argmax(super_class_output)   # adesso l'argomento è un vettore, non un batch
+                batch_class_decisions.append(super_class_decision)
+                item_decision = torch.argmax(item_output)
+                batch_item_decisions.append(item_decision)
 
                 # loss del batch e backward step
-                _class_loss = criterion(c_l, c_lbl)    # loss sulle classi
-                batch_class_loss += _class_loss
-                _item_loss = criterion(i_l, i_lbl)   # loss sui prodotti
-                batch_item_loss += _item_loss
+                super_class_loss = criterion(super_class_logit, super_class_label)    # loss sulle classi
+                batch_class_loss += super_class_loss
+                item_loss = criterion(item_logit, item_label)   # loss sui prodotti
+                batch_item_loss += item_loss
                 # loss totale, aggiungo enfasi alla class loss perchè determina in cascata la possibilità
                 # di classificare corretttamente il prodotto
-                _total_loss = 2.0 * _class_loss + _item_loss
-                _total_loss.backward()
+                total_loss = 2.0 * super_class_loss + item_loss
+                total_loss.backward()
+            # aggiorno i pesi
             optimizer.step()
             optimizer.zero_grad()
 
