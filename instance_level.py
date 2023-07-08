@@ -244,7 +244,7 @@ class MoE(nn.Module):
         # la indirizzo alla testa scelta da decision
         item_logits = self.heads[super_class_decision.item()].forward(feature_encoding)
         # all_item_logits += (item_logits,)
-        item_output = F.softmax(item_logits)  # class probabilities
+        item_output = F.softmax(item_logits, dim=1)  # class probabilities
         # all_item_outputs += (item_outputs,)
 
         return super_class_logits, super_class_output, item_logits, item_output
