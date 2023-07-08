@@ -232,22 +232,22 @@ class MoE(nn.Module):
 
     def forward(self, x):
         # il metodo forward() di resnet è stato modificato per ritornare anche il feature vector
-        super_class_logits, feature_vectors = self.resnet.forward(x)
-        super_class_outputs = F.softmax(super_class_logits, dim=1)  # class probabilities
-        super_class_decision = torch.argmax(super_class_outputs, dim=1)  # questo è un tensore di dimensione batch_size
+        super_class_logits, feature_vector = self.resnet.forward(x)
+        super_class_output = F.softmax(super_class_logits, dim=1)  # class probabilities
+        super_class_decision = torch.argmax(super_class_output, dim=1)  # questo è un tensore di dimensione batch_size
         # ciclo su ogni risultato e lo indirizzo alla testa giusta
-        all_item_logits = ()
-        all_item_outputs = ()
-        for i, decision in enumerate(super_class_decision):
-            # prendo una per una le encoding delle immagini
-            feature_encoding = feature_vectors[i]
-            # la indirizzo alla testa scelta da decision
-            item_logits = self.heads[decision.item()].forward(feature_encoding)
-            all_item_logits += (item_logits,)
-            item_outputs = F.softmax(item_logits)  # class probabilities
-            all_item_outputs += (item_outputs,)
+        # all_item_logits = ()
+        # all_item_outputs = ()
+        # for i, decision in enumerate(super_class_decision):
+        # prendo una per una le encoding delle immagini
+        feature_encoding = feature_vector
+        # la indirizzo alla testa scelta da decision
+        item_logits = self.heads[super_class_decision.item()].forward(feature_encoding)
+        # all_item_logits += (item_logits,)
+        item_output = F.softmax(item_logits)  # class probabilities
+        # all_item_outputs += (item_outputs,)
 
-        return super_class_logits, super_class_outputs, all_item_logits, all_item_outputs
+        return super_class_logits, super_class_output, item_logits, item_output
 
 
 class Classifier:
