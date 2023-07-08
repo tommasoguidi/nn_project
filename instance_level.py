@@ -492,8 +492,8 @@ class Classifier:
             # in modo da preservare la batch_mode
             for image, super_class_label, item_label in zip(images, super_class_labels, item_labels):
                 image = torch.unsqueeze(image.to(self.device), dim=0)
-                super_class_label = torch.unsqueeze(super_class_label.to(self.device))
-                item_label = torch.unsqueeze(item_label.to(self.device))
+                super_class_label = torch.unsqueeze(super_class_label.to(self.device), dim=0)
+                item_label = torch.unsqueeze(item_label.to(self.device), dim=0)
                 # output della rete
                 super_class_logit, super_class_output, item_logit, item_output = self.forward(image)
 
