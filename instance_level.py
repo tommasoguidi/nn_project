@@ -468,6 +468,7 @@ class Classifier:
         :param writer:      per salvare le metriche.
         :return:
         """
+        torch.backends.cudnn.enabled = False
         self.model.train()      # modalità train
         optimizer.zero_grad()   # svuoto i gradienti
 
