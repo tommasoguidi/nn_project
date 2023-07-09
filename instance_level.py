@@ -577,36 +577,55 @@ class Classifier:
         epoch_item_correct = 0  # segno le prediction corrette della rete per poi calcolare l'accuracy sui prodotti
         tot_cases = 0  # counter dei casi totali (sarebbe la len(dataset_train))
         for sample in progress:
+            batch_class_decisions = []
+            batch_item_decisions = []
+            batch_class_loss = 0.0
+            batch_item_loss = 0.0
+
             images, super_class_labels, item_labels = sample
-            images = images.to(self.device)
-            super_class_labels = super_class_labels.to(self.device)
-            item_labels = item_labels.to(self.device)
-
             batch_cases = images.shape[0]  # numero di sample nel batch
-            tot_cases += batch_cases  # accumulo il numero totale di sample
+            tot_cases += batch_cases  # accumulo il numero totale di esempi
+            # adesso il problema è che per ogni esempio l'architettura della rete cambia, quindi per aggiornare i
+            # gradienti non mi viene in mente altro che ciclare sui vari esempi, facendo lo step alla fine del ciclo
+            # in modo da preservare la batch_mode
+            for image, super_class_label, item_label in zip(images, super_class_labels, item_labels):
+                image = torch.unsqueeze(image.to(self.device), dim=0)
+                super_class_label = torch.unsqueeze(super_class_label.to(self.device), dim=0)
+                item_label = torch.unsqueeze(item_label.to(self.device), dim=0)
+                # output della rete
+                super_class_logit, super_class_output, item_logit, item_output = self.forward(image, super_class_label)
+                # il risultato di softmax viene interpretato con politica winner takes all
+                super_class_decision = torch.argmax(super_class_output)  # adesso l'argomento è un vettore, non un batch
+                batch_class_decisions.append(super_class_decision)
+                item_decision = torch.argmax(item_output)
+                batch_item_decisions.append(item_decision)
 
-            # output della rete
-            super_class_logits, super_class_outputs, item_logits, item_outputs = self.forward(images)
-            # il risultato di softmax viene interpretato con politica winner takes all
-            batch_class_decisions = torch.argmax(super_class_outputs, dim=1)
-            batch_item_decisions = torch.argmax(item_outputs, dim=1)
+                # loss del batch e backward step
 
-            # loss del batch e backward step
-            batch_class_loss = criterion(super_class_logits, super_class_labels)  # loss sulle classi
-            batch_item_loss = criterion(item_logits, item_labels)  # loss sui prodotti
+                super_class_loss = criterion(super_class_logit, super_class_label)  # loss sulle classi
+                batch_class_loss += super_class_loss
+                item_loss = criterion(item_logit, item_label)  # loss sui prodotti
+                batch_item_loss += item_loss
+
+                # trasformo in tensori le liste in cui ho accumulato le varie loss
+                batch_class_decisions = torch.tensor(batch_class_decisions, device=self.device)
+                batch_item_decisions = torch.tensor(batch_item_decisions, device=self.device)
 
             # accumulo le metriche di interesse
-            epoch_class_loss += batch_class_loss.item()
-            batch_class_correct = torch.sum(batch_class_decisions == super_class_labels)
+            epoch_class_loss += batch_class_loss
+            class_bool = batch_class_decisions == super_class_labels.to(self.device)
+            batch_class_correct = torch.sum(class_bool)
             epoch_class_correct += batch_class_correct.item()
 
-            epoch_item_loss += batch_item_loss.item()
-            batch_item_correct = torch.sum((batch_class_decisions == super_class_labels) and (batch_item_decisions == item_labels))
+            epoch_item_loss += batch_item_loss
+            # la classificazione del prodotto è corretta se lo era anche quella della super class
+            item_bool = (batch_item_decisions == item_labels.to(self.device))
+            batch_item_correct = torch.sum(torch.logical_and(class_bool, item_bool))
             epoch_item_correct += batch_item_correct.item()
 
-            postfix = {'batch_mean_class_loss': batch_class_loss.item() / batch_cases,
+            postfix = {'batch_mean_class_loss': (batch_class_loss / batch_cases).item(),
                        'batch_class_accuracy': batch_class_correct.item() / batch_cases,
-                       'batch_mean_item_loss': batch_item_loss.item() / batch_cases,
+                       'batch_mean_item_loss': (batch_item_loss / batch_cases).item(),
                        'batch_item_accuracy': batch_item_correct.item() / batch_cases}
             progress.set_postfix(postfix)
 
