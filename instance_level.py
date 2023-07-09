@@ -230,7 +230,9 @@ class MoE(nn.Module):
         # la i-esima istanza ha come in_features la dimensione delle feature uscenti dalla resnet dopo flatten() (2048)
         # e come classes il numero dei prodotti appartenenti alla i-esima super class
         self.heads = nn.ModuleList([Head(2048, self.len_item_classes[i]) for i in range(self.num_super_classes)])
+        print(f'in tutto ho {len(self.heads)}')
         for i in self.heads:
+            print(f'testa')
             print(summary(i, (1, 2048)))
 
     def forward(self, x):
