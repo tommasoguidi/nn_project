@@ -774,6 +774,7 @@ def main(args):
             class_mapping = val_ds.mapping
             print(len(class_mapping))
             print([len(class_mapping[key]) - 1 for key in class_mapping])
+            print([class_mapping[key][i] for key in class_mapping for i in class_mapping[key]])
             val_ds.set_transforms(val_transforms)
             val_loader = DataLoader(val_ds, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS)
 
