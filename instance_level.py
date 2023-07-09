@@ -191,7 +191,7 @@ class MyResNet(nn.Module):
             model_state = torch.load(weights, map_location=self.device)
             self.resnet.load_state_dict(model_state["model"])
             # congelo i parametri per allenare solo il layer finale
-            for p in self.model.parameters():
+            for p in self.resnet.parameters():
                 p.requires_grad = False
         else:
             self.resnet = resnet50(weights='DEFAULT', progress=True)    # carico i pesi di imagenet
