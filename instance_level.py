@@ -21,15 +21,16 @@ class MyDataset(Dataset):
     Crea gli split del dataset. Per eseguire la cross validation, uno di questi dovrà essere usato come validation,
     gli altri devono essere uniti per ottenere il train usando la classe Concat.
     """
-    def __init__(self, path: Path, n_folds: int, split: int, mode: str, transforms: transforms.Compose):
+    def __init__(self, path: Path, n_folds: int, split: int, mode: str, transforms: transforms.Compose, method: str):
         """
         Crea il dataset a partire dal percorso indicato.
 
-        :param path:        percorso della cartella contenente il dataset
-        :param n_folds:     numero di fold per crossvalidation
-        :param split:       indice per identificare quale split stiamo usando
-        :param mode:        per dire se stiamo facendo 'train' o 'eval'
-        :param transforms:  le trasformazioni da applicare all'immagine
+        :param path:        percorso della cartella contenente il dataset.
+        :param n_folds:     numero di fold per crossvalidation.
+        :param split:       indice per identificare quale split stiamo usando.
+        :param mode:        per dire se stiamo facendo 'train' o 'eval'.
+        :param transforms:  le trasformazioni da applicare all'immagine.
+        :param method:      naive o moe.
         """
         self.path = path
         self.img_dir = path / 'images'
@@ -37,6 +38,7 @@ class MyDataset(Dataset):
         self.n_folds = n_folds
         self.split = split
         self.mode = mode
+        self.method = method
         # in eval mode vogliamo usare il test set, che è stato ottenuto dalla coda del dataset totale (maggiori info
         # sotto _get_ids_in_split())
         if self.mode == 'eval':
@@ -48,19 +50,23 @@ class MyDataset(Dataset):
         # QUI CAMBIA RISPETTO A PRIMA PERCHE' LE CLASSI DIVENTANO I PRODUCT_ID UNIVOCI PER OGNI PRODOTTO
         #
         #
-        self.all_classes = self.annos['item_id'].unique().tolist()   # tutte le classi del dataset
+        self.all_classes = sorted(self.annos['item_id'].unique().tolist())   # tutte le classi del dataset
         self.all_super_classes = sorted(self.annos['product_type'].unique().tolist())     # classi del caso semplice
         self.mapping = {}
-        for i, super_class in enumerate(self.all_super_classes):
-            # tutte le righe del dataframe relative ad una categoria merceologica
-            _listings_in_superclass = self.annos[self.annos['product_type'] == super_class]
-            # lista degli item_id univoci della superclass (metterli in ordine ovviamente non cambia niente)
-            _items_in_superclass = sorted(_listings_in_superclass['item_id'].unique().tolist())
-            # identifier sarà l'int che identifica la superclass i
-            self.mapping[super_class] = {'identifier': i}
-            # sotto la superclass, associo un intero a ciascuno degli item univoci
-            for j, item_id in enumerate(_items_in_superclass):
-                self.mapping[super_class][item_id] = j
+        if self.method == 'naive':
+            for i, item_id in enumerate(self.all_classes):
+                self.mapping[item_id] = i
+        else:
+            for i, super_class in enumerate(self.all_super_classes):
+                # tutte le righe del dataframe relative ad una categoria merceologica
+                _listings_in_superclass = self.annos[self.annos['product_type'] == super_class]
+                # lista degli item_id univoci della superclass (metterli in ordine ovviamente non cambia niente)
+                _items_in_superclass = sorted(_listings_in_superclass['item_id'].unique().tolist())
+                # identifier sarà l'int che identifica la superclass i
+                self.mapping[super_class] = {'identifier': i}
+                # sotto la superclass, associo un intero a ciascuno degli item univoci
+                for j, item_id in enumerate(_items_in_superclass):
+                    self.mapping[super_class][item_id] = j
         # ciclicamente solo una porzione del dataset completo viene utilizzata (sarà usata come validation set)
         self.image_ids = self._get_ids_in_split()
 
@@ -88,10 +94,13 @@ class MyDataset(Dataset):
         # 'product_type', che vengono mappati al loro valore intero di riferimento e trasformati in un tensore
         super_class_label = self.annos.loc[image_id, 'product_type']
         item_label = self.annos.loc[image_id, 'item_id']
-        item_label = torch.tensor(self.mapping[super_class_label][item_label], dtype=torch.long)
-        super_class_label = torch.tensor(self.mapping[super_class_label]['identifier'], dtype=torch.long)
-
-        return image, super_class_label, item_label
+        if self.method == 'naive':
+            item_label = torch.tensor(self.mapping[item_label], dtype=torch.long)
+            return image, item_label
+        else:
+            item_label = torch.tensor(self.mapping[super_class_label][item_label], dtype=torch.long)
+            super_class_label = torch.tensor(self.mapping[super_class_label]['identifier'], dtype=torch.long)
+            return image, super_class_label, item_label
 
     def _get_ids_in_split(self):
         """
@@ -249,8 +258,9 @@ class MoE(nn.Module):
 
     def forward(self, x, super_class):
         # il metodo forward() di resnet è stato modificato per ritornare anche il feature vector
+        # il forward di moe avviene su un singolo evento e non su un batch
         super_class_logits, feature_vector = self.resnet.forward(x)
-        super_class_output = F.softmax(super_class_logits, dim=0)  # class probabilities
+        super_class_output = F.softmax(super_class_logits, dim=0)  # class probability
         super_class_decision = torch.argmax(super_class_output)
         feature_encoding = feature_vector
         # la indirizzo alla testa scelta da decision
@@ -359,7 +369,7 @@ class Classifier:
         epoch_correct = 0   # segno le prediction corrette della rete per poi calcolare l'accuracy
         tot_cases = 0       # counter dei casi totali (sarebbe la len(dataset_train))
         for sample in progress:
-            images, _, labels = sample             # non mi interessa della super class
+            images, labels = sample             # non mi interessa della super class
             images, labels = images.to(self.device), labels.to(self.device)
 
             batch_cases = images.shape[0]  # numero di sample nel batch
@@ -409,7 +419,7 @@ class Classifier:
         epoch_correct = 0  # segno le prediction corrette della rete per poi calcolare l'accuracy
         tot_cases = 0  # counter dei casi totali (sarebbe la len(dataset_val))
         for sample in progress:
-            images, _, labels = sample  # __getitem__ restituisce una tupla (image, label)
+            images, labels = sample  # __getitem__ restituisce una tupla (image, label)
             images, labels = images.to(self.device), labels.to(self.device)
 
             batch_cases = images.shape[0]  # numero di sample nel batch
@@ -454,7 +464,7 @@ class Classifier:
         correct = 0  # segno le prediction corrette della rete per poi calcolare l'accuracy
         tot_cases = 0  # counter dei casi totali (sarebbe la len(dataset_test))
         for sample in progress:
-            images, _, labels = sample  # __getitem__ restituisce una tupla (image, label)
+            images, labels = sample  # __getitem__ restituisce una tupla (image, label)
             images, labels = images.to(self.device), labels.to(self.device)
 
             batch_cases = images.shape[0]  # numero di sample nel batch
@@ -825,7 +835,7 @@ def main(args):
         splits = []     # qui salvo gli n_folds dataset che sono i singoli split
         best_results = []
         for i in tqdm(range(N_FOLDS), total=N_FOLDS, desc='Creo gli split del dataset.'):
-            splits.append(MyDataset(ROOT, N_FOLDS, i, mode=MODE, transforms=val_transforms))
+            splits.append(MyDataset(ROOT, N_FOLDS, i, mode=MODE, transforms=val_transforms, method=METHOD))
 
         for i, split in tqdm(enumerate(splits), total=N_FOLDS, desc=f'{N_FOLDS}-fold cross validation...'):
             # ciclicamente uso uno split come val, reimposto le transforms a val_transforms nel caso fossero state

@@ -101,5 +101,17 @@ modello in grado non più di classificare gli oggetti secondo il loro
 `product_type`, ma di riconoscere i singoli prodotti all'interno di
 ciascuna categoria. Sono stati implementati due approcci:
 - il metodo `naive` è semplicemente una ResNet con tanti neuroni di output
-quanti sono i prodotti nel dataset (circa 9000);
-- il metodo `MoE` usa la ResNet come feature extractor
+quanti sono i prodotti nel dataset (circa 9100);
+- il metodo `MoE` usa la ResNet come feature extractor e poi un'ensemble di 
+classification heads, ciascuna allenata specificamente a separare i prodotti
+di un determinato `product_type`.
+
+### `instance_level.py`
+
+Di seguito la lista degli argomenti accettati:
+- tutti quelli di `classifier.py`, ad eccezione di `--backbone`, che in questo
+caso è sempre ResNet;
+- `--method` consente di scegliere tra il metodo `naive` e `moe`;
+- `--pretrained` consente di specificare che MoE usi come faetures extractor
+la ResNet ottenuta al punto precedente e indicata da `--weights` (di default
+viene riallenato tutto insieme).
