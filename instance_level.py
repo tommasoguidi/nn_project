@@ -541,9 +541,9 @@ class Classifier:
             batch_item_correct = torch.sum(torch.logical_and(class_bool, item_bool))
             epoch_item_correct += batch_item_correct.item()
 
-            postfix = {'batch_mean_class_loss': batch_class_loss/batch_cases,
-                       'batch_class_accuracy': batch_class_correct.item()/batch_cases,
-                       'batch_mean_item_loss': batch_item_loss / batch_cases,
+            postfix = {'batch_mean_class_loss': (batch_class_loss / batch_cases).item(),
+                       'batch_class_accuracy': batch_class_correct.item() / batch_cases,
+                       'batch_mean_item_loss': (batch_item_loss / batch_cases).item(),
                        'batch_item_accuracy': batch_item_correct.item() / batch_cases}
             progress.set_postfix(postfix)
 
