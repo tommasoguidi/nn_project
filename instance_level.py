@@ -250,7 +250,7 @@ class MoE(nn.Module):
     def forward(self, x, super_class):
         # il metodo forward() di resnet è stato modificato per ritornare anche il feature vector
         super_class_logits, feature_vector = self.resnet.forward(x)
-        super_class_output = F.softmax(super_class_logits)  # class probabilities
+        super_class_output = F.softmax(super_class_logits, dim=0)  # class probabilities
         super_class_decision = torch.argmax(super_class_output)
         feature_encoding = feature_vector
         # la indirizzo alla testa scelta da decision
@@ -258,7 +258,7 @@ class MoE(nn.Module):
             item_logits = self.heads[super_class.item()].forward(feature_encoding)
         else:
             item_logits = self.heads[super_class_decision.item()].forward(feature_encoding)     # caso eval
-        item_output = F.softmax(item_logits)  # class probability
+        item_output = F.softmax(item_logits, dim=0)  # class probability
 
         return super_class_logits, super_class_output, item_logits, item_output
 
