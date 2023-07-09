@@ -229,7 +229,7 @@ class MoE(nn.Module):
         # creo un'istanza della classe Head() per ogni super classe e la aggiungo alla ModuleList
         # la i-esima istanza ha come in_features la dimensione delle feature uscenti dalla resnet dopo flatten() (2048)
         # e come classes il numero dei prodotti appartenenti alla i-esima super class
-        self.heads = nn.ModuleList([Head(2048, self.len_item_classes[i] - 1) for i in range(self.num_super_classes)])
+        self.heads = nn.ModuleList([Head(2048, self.len_item_classes[i]) for i in range(self.num_super_classes)])
 
     def forward(self, x):
         # il metodo forward() di resnet è stato modificato per ritornare anche il feature vector
@@ -770,7 +770,8 @@ def main(args):
             # cambiate in precedenza
             val_ds = split  # split è il dataset che sto usando come validation
             class_mapping = val_ds.mapping
-            print(class_mapping)
+            print(len(class_mapping))
+            print([len(class_mapping[key]) - 1 for key in class_mapping])
             val_ds.set_transforms(val_transforms)
             val_loader = DataLoader(val_ds, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS)
 
@@ -779,7 +780,8 @@ def main(args):
             train_datasets = [j for j in splits if j is not split]  # come train uso gli altri, unendoli con Concat
             for d in train_datasets:
                 d.set_transforms(train_transforms)
-                print(d.mapping)
+                print(len(d.mapping))
+                print([len(d.mapping[key]) - 1 for key in d.mapping])
             train_ds = Concat(train_datasets)
             train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
 
