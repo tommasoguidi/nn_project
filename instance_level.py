@@ -12,8 +12,7 @@ from torch.utils.tensorboard import SummaryWriter
 import torch.nn as nn
 import torch.nn.functional as F
 from torchvision import transforms
-from torchvision.models.resnet import resnet50, ResNet
-from torchvision.models._utils import _ovewrite_named_param
+from torchvision.models.resnet import resnet50
 from torchinfo import summary
 
 
@@ -223,6 +222,8 @@ class MoE(nn.Module):
         super().__init__()
         self.num_super_classes = num_super_classes
         self.len_item_classes = len_item_classes
+        print(self.num_super_classes)
+        print(self.len_item_classes)
         # metto la mia resnet con forward modificato
         self.resnet = MyResNet(num_super_classes=self.num_super_classes)
         # creo un'istanza della classe Head() per ogni super classe e la aggiungo alla ModuleList
@@ -468,7 +469,6 @@ class Classifier:
         :param writer:      per salvare le metriche.
         :return:
         """
-        torch.backends.cudnn.enabled = False
         self.model.train()      # modalità train
         optimizer.zero_grad()   # svuoto i gradienti
 
@@ -511,7 +511,7 @@ class Classifier:
                 batch_item_loss += item_loss
                 # loss totale, aggiungo enfasi alla class loss perchè determina in cascata la possibilità
                 # di classificare corretttamente il prodotto
-                total_loss = super_class_loss + item_loss
+                total_loss = 2.0 * super_class_loss + item_loss
                 total_loss.backward()
             # aggiorno i pesi
             optimizer.step()
@@ -770,6 +770,7 @@ def main(args):
             # cambiate in precedenza
             val_ds = split  # split è il dataset che sto usando come validation
             class_mapping = val_ds.mapping
+            print(class_mapping)
             val_ds.set_transforms(val_transforms)
             val_loader = DataLoader(val_ds, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS)
 
@@ -778,6 +779,7 @@ def main(args):
             train_datasets = [j for j in splits if j is not split]  # come train uso gli altri, unendoli con Concat
             for d in train_datasets:
                 d.set_transforms(train_transforms)
+                print(d.mapping)
             train_ds = Concat(train_datasets)
             train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
 
