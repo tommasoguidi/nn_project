@@ -229,7 +229,7 @@ class MoE(nn.Module):
         # creo un'istanza della classe Head() per ogni super classe e la aggiungo alla ModuleList
         # la i-esima istanza ha come in_features la dimensione delle feature uscenti dalla resnet dopo flatten() (2048)
         # e come classes il numero dei prodotti appartenenti alla i-esima super class
-        self.heads = nn.ModuleList([Head(2048, self.len_item_classes[i]) for i in range(self.num_super_classes)])
+        self.heads = nn.ModuleList([Head(2048, self.len_item_classes[i] - 1) for i in range(self.num_super_classes)])
 
     def forward(self, x):
         # il metodo forward() di resnet è stato modificato per ritornare anche il feature vector
