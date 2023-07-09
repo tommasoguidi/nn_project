@@ -484,8 +484,8 @@ def main(args):
         # a questo giro deve essere il percorso completo alla cartella in cui sono stati salvati i progressi
         # del modello prescelto
         actual_dir = CHECKPOINT_DIR
-        # per creare il dataset non passo il parametro split perchè non serve (__init__ lo setta a n_folds)
-        test_ds = MyDataset(ROOT, N_FOLDS, mode=MODE, transforms=val_transforms)
+        # per creare il dataset passo il parametro split ma non serve (__init__ lo setta a n_folds)
+        test_ds = MyDataset(ROOT, N_FOLDS, split=0, mode=MODE, transforms=val_transforms)
         class_mapping = test_ds.mapping
         test_loader = DataLoader(test_ds, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS)
 

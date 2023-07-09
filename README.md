@@ -99,4 +99,7 @@ modello sul dataset di test.
 La seconda fase del progetto si incentra sul tentativo di sviluppare un
 modello in grado non più di classificare gli oggetti secondo il loro
 `product_type`, ma di riconoscere i singoli prodotti all'interno di
-ciascuna categoria.
+ciascuna categoria. Sono stati implementati due approcci:
+- il metodo `naive` è semplicemente una ResNet con tanti neuroni di output
+quanti sono i prodotti nel dataset (circa 9000);
+- il metodo `MoE` usa la ResNet come feature extractor
