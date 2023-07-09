@@ -519,8 +519,8 @@ class Classifier:
                 except:
                     print(f'super_class_logit = {super_class_logit}')
                     print(f'super_class_label = {super_class_label}')
-                    print(f'item_logit = {item_logit}')
-                    print(f'item_label = {item_label}')
+                    print(f'item_logit = {item_logit.size()}')
+                    print(f'item_label = {item_label.size()}')
 
             # aggiorno i pesi
             optimizer.step()
