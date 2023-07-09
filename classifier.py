@@ -26,11 +26,11 @@ class MyDataset(Dataset):
         """
         Crea il dataset a partire dal percorso indicato.
 
-        :param path:        percorso della cartella contenente il dataset
-        :param n_folds:     numero di fold per crossvalidation
-        :param split:       indice per identificare quale split stiamo usando
-        :param mode:        per dire se stiamo facendo 'train' o 'eval'
-        :param transforms:  le trasformazioni da applicare all'immagine
+        :param path:        percorso della cartella contenente il dataset.
+        :param n_folds:     numero di fold per crossvalidation.
+        :param split:       indice per identificare quale split stiamo usando.
+        :param mode:        per dire se stiamo facendo 'train' o 'eval'.
+        :param transforms:  le trasformazioni da applicare all'immagine.
         """
         self.path = path
         self.img_dir = path / 'images'
@@ -41,7 +41,7 @@ class MyDataset(Dataset):
         # in eval mode vogliamo usare il test set, che è stato ottenuto dalla coda del dataset totale (maggiori info
         # sotto _get_ids_in_split())
         if self.mode == 'eval':
-            self.split = self.n_folds
+            self.split = self.n_folds   # quando testo voglio usare il set di hold out che ho escluso dagli split
         self.transforms = transforms
         self.all_ids = self.annos.index.tolist()    # lista di tutti gli image_id
         self.all_classes = sorted(self.annos['product_type'].unique().tolist())     # tutte le classi del dataset
@@ -84,7 +84,7 @@ class MyDataset(Dataset):
         """
         ids_in_split = []
         for _class in self.all_classes:
-            # metto in una lista tutte gli image_id di una determinata classe
+            # metto in una lista tutti gli image_id di una determinata classe
             ids_in_class = self.annos.index[self.annos['product_type'] == _class].tolist()
             random.shuffle(ids_in_class)
             # splitto in n_folds + 1 per avere un hold out su cui fare il test (l'ultimo degli split)
@@ -117,7 +117,7 @@ class Concat(Dataset):
     La classe MyDataset prende l'intero dataset e crea n_folds+1 split bilanciati. I primi n_folds verranno usati
     per fare stratified k-fold crossvalidation, l'ultimo viene tenuto come test. Per fare k-fold, ciclicamente tengo
     uno degli split come validation e gli altri come train. Questa classe consente di unire due split in un unico
-    dataset e verrà utilizzata per ottenre i dataset di train.
+    dataset e verrà utilizzata per ottenere i dataset di train.
     """
 
     def __init__(self, datasets: list):
@@ -150,10 +150,11 @@ class Classifier:
 
     def __init__(self, backbone: str, device: str, ckpt_dir: Path, mapping: dict):
         """
+        Classe che consente di creare, allenare e testare il modello responsabile della classificazione.
 
         :param backbone:    la rete alla base del classificatore (cnn base o resnet).
         :param device:      per decidere se svolgere i conti sulla cpu o sulla gpu.
-        :param ckpt_dir:    directory in cui salvare i risultati dei vari esperimetni di train.
+        :param ckpt_dir:    directory in cui salvare i risultati dei vari esperimenti di train.
         :param mapping:     mapping delle classi.
         """
         self.device = device
@@ -186,9 +187,6 @@ class Classifier:
         elif backbone == 'resnet':
             # carico il modello pretrainato di resnet50 su imagenet
             self.model = resnet50(weights='DEFAULT', progress=True)
-            # congelo i parametri per allenare solo il layer finale
-            # for p in self.model.parameters():
-            #     p.requires_grad = False
             # congelo i parametri tranne quelli degli ultimi 3 blocchi
             blocks = list(self.model.children())
             for b in blocks[:-3]:

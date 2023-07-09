@@ -181,17 +181,27 @@ class Head(nn.Module):
 
 class MyResNet(nn.Module):
     """Riscrivo il forward della ResNet originaria per prelevare il vettore delle features"""
-    def __init__(self, num_super_classes):
+    def __init__(self, num_super_classes, pretrained, weights, device):
         super().__init__()
-        # carico la resnet
-        self.resnet = resnet50(weights='DEFAULT', progress=True)
-        # congelo i parametri tranne quelli dell'ultimo bottleneck
-        blocks = list(self.resnet.children())
-        for b in blocks[:-3]:
-            for p in b.parameters():
+        self.device = device
+        if pretrained:
+            self.resnet = resnet50()
+            # modifico il final layer per poter caricare i miei pesi
+            self.resnet.fc = nn.Linear(2048, num_super_classes)
+            model_state = torch.load(weights, map_location=self.device)
+            self.resnet.load_state_dict(model_state["model"])
+            # congelo i parametri per allenare solo il layer finale
+            for p in self.model.parameters():
                 p.requires_grad = False
-        # modifico il linear layer per la classificazione della super classe
-        self.resnet.fc = nn.Linear(2048, num_super_classes)
+        else:
+            self.resnet = resnet50(weights='DEFAULT', progress=True)    # carico i pesi di imagenet
+            # congelo i parametri tranne quelli dell'ultimo bottleneck
+            blocks = list(self.resnet.children())
+            for b in blocks[:-3]:
+                for p in b.parameters():
+                    p.requires_grad = False
+            # modifico il linear layer per la classificazione della super classe
+            self.resnet.fc = nn.Linear(2048, num_super_classes)
 
     def forward(self, x):
         # implementazione ufficiale pytorch del forward, modificata per ritornare il feature vector
@@ -217,18 +227,21 @@ class MoE(nn.Module):
     Il modulo è composto dalla resnet preallenata su imagenet e una lista di classification heads, una per ciascuna
     classe.
     """
-    def __init__(self, num_super_classes: int, len_item_classes: list):
+    def __init__(self, num_super_classes: int, len_item_classes: list, pretrained: bool, weights: Path, device: str):
         """
 
         :param num_super_classes:   numero delle super classi.
         :param len_item_classes:    lista con il numero di prodotti per ciascuna super classe
                                     -> len_item_classes[i] è il numero di prodotti della classe i.
+        :param pretrained:          se caricare il modello preallentato di resnet.
+        :param weights:             percorso dei pesi da caricare.
+        :param device:              cpu o gpu.
         """
         super().__init__()
         self.num_super_classes = num_super_classes
         self.len_item_classes = len_item_classes
         # metto la mia resnet con forward modificato
-        self.resnet = MyResNet(num_super_classes=self.num_super_classes)
+        self.resnet = MyResNet(self.num_super_classes, pretrained, weights, device)
         # creo un'istanza della classe Head() per ogni super classe e la aggiungo alla ModuleList
         # la i-esima istanza ha come in_features la dimensione delle feature uscenti dalla resnet dopo flatten() (2048)
         # e come classes il numero dei prodotti appartenenti alla i-esima super class
@@ -253,7 +266,7 @@ class MoE(nn.Module):
 class Classifier:
     """Classificatore per le 50 classi in esame"""
 
-    def __init__(self, method: str, device: str, ckpt_dir: Path, mapping: dict, weights: Path):
+    def __init__(self, method: str, device: str, ckpt_dir: Path, mapping: dict, weights: Path, pretrained: bool):
         """
 
         :param method:      come classificare le varie istanze (naive o mixture of expert).
@@ -261,6 +274,7 @@ class Classifier:
         :param ckpt_dir:    directory in cui salvare i risultati dei vari esperimetni di train.
         :param mapping:     mapping delle classi.
         :param weights:     percorso dei pesi da caricare.
+        :param pretrained:  se usare o meno il modello preallenato come backbone di MoE.
         """
         self.method = method
         self.device = device
@@ -290,7 +304,7 @@ class Classifier:
 
         else:
             # carico il modello pretrainato di resnet50 su imagenet
-            self.model = MoE(self.num_super_classes, self.len_item_classes)
+            self.model = MoE(self.num_super_classes, self.len_item_classes, pretrained, weights, self.device)
 
         # # stampa a schermo la rete
         # summary(self.model, input_size=(1, 3, 224, 224))
@@ -783,6 +797,7 @@ def main(args):
     CHECKPOINT_DIR = Path(args.checkpoint_dir)
     METHOD = args.method
     WEIGHTS = Path(args.weights)
+    PRETRAINED = args.pretrained
 
     assert MODE in ['train', 'eval'], '--mode deve essere uno tra "train" e "eval".'
     assert DEVICE in ['cuda', 'cpu'], '--device deve essere uno tra "cuda" e "cpu".'
@@ -828,7 +843,7 @@ def main(args):
             train_ds = Concat(train_datasets)
             train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
 
-            cls = Classifier(METHOD, DEVICE, actual_dir, class_mapping, WEIGHTS)      # inizializzo il classificatore
+            cls = Classifier(METHOD, DEVICE, actual_dir, class_mapping, WEIGHTS, PRETRAINED)
             train_result = cls.train(train_loader, val_loader, i, EPOCHS, LR)      # alleno
             best_results.append(train_result)
 
@@ -897,6 +912,8 @@ if __name__ == '__main__':
                              ' anche la backbone a partire dai pesi di imagenet.')
     parser.add_argument('--weights', type=str, default='classifier.pth',
                         help='Percorso dei pesi da usare per il feature extractor.')
+    parser.add_argument('--pretrained', type=bool, default=False,
+                        help='Per decidere se allenare anche la resnet o semplicemente caricare i pesi di --weights.')
 
     arguments = parser.parse_args()
     main(arguments)

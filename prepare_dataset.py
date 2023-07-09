@@ -108,6 +108,8 @@ def get_useful_listings(listings_dir: Path,
 
     # essendo molto sbilanciato, andremo a fare un subsampling delle classi più rappresentate, per evitare di tenere
     # nel dataset prodotti con meno di min_images immagini, faremo il sampling sui prodotti invece che sulle immagini
+    # quello che segue è un approccio molto conservativo, potrebbe essere combinato ad un upsampling delle classi
+    # meno rappresentate
     avg = int(np.mean(top_n_imgs_per_class))     # numero medio di immagini in ciascuna delle top_n classi
     product_kept = []   # lista degli item_id da tenere nel subset
     for _class, _n_imgs in zip(top_n_classes, top_n_imgs_per_class):
@@ -127,48 +129,54 @@ def get_useful_listings(listings_dir: Path,
     # finalmente tutte e sole le inserzioni ceh ci interessano
     final_metadata = useful_listings[useful_listings['item_id'].isin(product_kept)]
     f_name = dest_dir / 'subset_10_images.csv'
-    final_metadata.to_csv(f_name)
+    final_metadata.to_csv(f_name)   # salvo le annotazioni
     return final_metadata
 
 
-def save_images(imgs_dir: Path, dest_dir: Path, metadata: pd.DataFrame, args: argparse.ArgumentParser):
+def save_images(imgs_dir: Path, dest_dir: Path, metadata: pd.DataFrame, size: int):
     """
+    Rendo quadrate le immagini che non lo sono aggiungendo pixel bianchi, poi ridimensiono in modo che la dimensione
+    di ciascun lato sia pari a size. Infine salvo le immagini nella cartella desiderata.
 
-    :param imgs_dir:
-    :param dest_dir:
-    :param metadata:
-    :param args:
+    :param imgs_dir:    cartella contenente le immagini originali.
+    :param dest_dir:    destinazione in cui salvare le immagini preprocessate.
+    :param metadata:    dataframe già modificato, contenente tutte e sole le immagini da tenere nel subset.
+    :param size:        dimensione desiderata delle immagini (quadrate).
     :return:
     """
     index = metadata.index.tolist()
     tot_index = len(index)
     dest_dir = dest_dir / 'images'
     for idx in tqdm(index, total=tot_index, desc='Salvataggio delle immagini nel formato desiderato'):
-        data = metadata.loc[idx]
+        data = metadata.loc[idx]    # prendo la riga corrispondente a idx
         h = data['height']
         w = data['width']
         path = imgs_dir / data['path']
         img = cv2.imread(str(path))
+        # per fare il padding seleziono la dimensione massima e aggiungo pixel bianchi lungo l'altra
         new_dim = max(h, w)
-        if h != w:
-            bg = np.ones((new_dim, new_dim, 3), dtype=np.uint8)*255
-
+        if h != w:  # in questo caso l'immagine è già quadrata
+            # come background userò un'immagine (in realtà un array numpy) di pixel bianchi
+            bg = np.ones((new_dim, new_dim, 3), dtype=np.uint8) * 255
+            # calcolo le coordinate per centrare la vecchia immagine sullo sfondo bianco
             x_semi_offset = (new_dim - w)//2
             y_semi_offset = (new_dim - h) // 2
-
+            # le sovrappongo
             bg[y_semi_offset:y_semi_offset+h, x_semi_offset:x_semi_offset+w, :] = img
             img = bg
 
-        # resize (tranne il caso in cui sia già della giusta dimensione)
-        if new_dim > args.size:
-            resized = cv2.resize(img, (args.size, args.size), interpolation=cv2.INTER_AREA)
-        elif new_dim < args.size:
-            resized = cv2.resize(img, (args.size, args.size), interpolation=cv2.INTER_CUBIC)
+        # resize (tranne il caso in cui sia già della giusta dimensione), serve a poco, ma opencv consiglia di usare due
+        # metodi diversi se si fa downscaling o upscaling
+        if new_dim > size:
+            resized = cv2.resize(img, (size, size), interpolation=cv2.INTER_AREA)
+        elif new_dim < size:
+            resized = cv2.resize(img, (size, size), interpolation=cv2.INTER_CUBIC)
 
         # salviamo l'immagine
         dest_fname = dest_dir / data['path']
+        # 'path' è nella forma subdir/image_id.jpg, quindi estraggo subdir con split()
         dest_subdir = dest_dir / (data['path'].split('/')[0])
-        os.makedirs(dest_subdir, exist_ok=True)
+        os.makedirs(dest_subdir, exist_ok=True)     # crea la cartella e anche quelle intermedie se non esistono ancora
         cv2.imwrite(str(dest_fname), resized)
 
 
@@ -194,7 +202,7 @@ def main(args):
     # print(metadata)
     # metadata = pd.read_csv(dest_dir / 'subset_images.csv', index_col='image_id')
     # salva le immagini rimaste nel file csv del subset
-    save_images(imgs_dir, DEST, metadata, args)
+    save_images(imgs_dir, DEST, metadata, SIZE)
 
 
 if __name__ == '__main__':
