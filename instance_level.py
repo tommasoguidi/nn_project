@@ -607,9 +607,9 @@ class Classifier:
                 item_loss = criterion(item_logit, item_label)  # loss sui prodotti
                 batch_item_loss += item_loss
 
-                # trasformo in tensori le liste in cui ho accumulato le varie loss
-                batch_class_decisions = torch.tensor(batch_class_decisions, device=self.device)
-                batch_item_decisions = torch.tensor(batch_item_decisions, device=self.device)
+            # trasformo in tensori le liste in cui ho accumulato le varie loss
+            batch_class_decisions = torch.tensor(batch_class_decisions, device=self.device)
+            batch_item_decisions = torch.tensor(batch_item_decisions, device=self.device)
 
             # accumulo le metriche di interesse
             epoch_class_loss += batch_class_loss
