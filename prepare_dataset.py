@@ -8,45 +8,53 @@ import numpy as np
 import cv2
 
 
-def drop_by_ratio(imgs_metadata: pd.DataFrame, args: argparse.ArgumentParser):
+def drop_by_ratio(imgs_metadata: pd.DataFrame, ratio: int):
     """
     Prende il dataframe corretto con i metadati delle singole immagini e rimuove tutte quelle che non rispettano il
-    vincolo sull'aspect ratio
+    vincolo sull'aspect ratio.
 
-    :param imgs_metadata:   dataframe GIA' CORRETTO con dimensioni e path immagini
-    :param args:            argomenti passati da command line
-    :return:                dataframe filtrato dalle immagini secondo la loro aspect ratio
+    :param imgs_metadata:   dataframe GIA' CORRETTO con dimensioni e path immagini.
+    :param ratio:           tutte le immagini che hanno un rapporto max_dim/min_dim inferiore a ratio vengono scartate.
+    :return imgs_metadata:  dataframe filtrato dalle immagini secondo la loro aspect ratio.
     """
     dropped_imgs = []
     tot_imgs = imgs_metadata.shape[0]
-    for row in tqdm(imgs_metadata.iterrows(), total=tot_imgs, desc="Scarto le immagini secondo l'aspect ratio"):
-        index = row[0]
-        data = row[1]
+    # ciclo sulle righe
+    for row in tqdm(imgs_metadata.iterrows(), total=tot_imgs, desc="Scarto le immagini secondo l'aspect ratio."):
+        index = row[0]  # indice della riga
+        data = row[1]   # annotazioni
 
         h = data['height']
         w = data['width']
         max_dim = max(h, w)
         min_dim = min(h, w)
-        if max_dim / min_dim > args.ratio:
-            dropped_imgs.append(index)
+        if max_dim / min_dim > ratio:
+            dropped_imgs.append(index)  # aggiungo l'indice della riga alla lista di quelli da scartare
 
-    imgs_metadata.drop(index=dropped_imgs, inplace=True)
+    imgs_metadata.drop(index=dropped_imgs, inplace=True)    # scarto le righe con indice in dropped_images
 
     return imgs_metadata
 
 
-def get_useful_listings(listings_dir: Path, dest_dir: Path, imgs_metadata: pd.DataFrame, args: argparse.ArgumentParser):
+def get_useful_listings(listings_dir: Path,
+                        dest_dir: Path,
+                        imgs_metadata: pd.DataFrame,
+                        min_images: int,
+                        n_cat: int):
     """
-    La funzione ritorna un dataframe con index i singoli image_id di ciascun prodotto che è stato selezionato
-    nel subset (almeno --folds immagini dopo aver rimosso quelle che non rispettano il vincolo su --ratio, appartenenti
-    alle top --n-cat)
+    La funzione ritorna un dataframe i cui index sono i singoli image_id di ciascun prodotto che è stato selezionato
+    nel subset (almeno min_images immagini dopo aver rimosso quelle che non rispettano il vincolo su --ratio,
+    appartenenti alle top n_cat). Dopo aver selezionato le n_cat classi, per bilanciare un po' il dataset, che risulta
+    fortemente sbilanciato, viene eseguito un downsampling delle classi con un numero di prodotti superiore alla media.
 
-    :param listings_dir:        directory dei metadati delle inserzioni
-    :param dest_dir:            directory di destinazione del subset
-    :param imgs_metadata:       il dataframe contenente le annotazioni corrette sulle immagini
-    :param args:                argomenti passati da command line
+    :param listings_dir:        directory dei metadati delle inserzioni.
+    :param dest_dir:            directory di destinazione del subset.
+    :param imgs_metadata:       il dataframe contenente le annotazioni corrette sulle immagini.
+    :param min_images:          le inserzioni con un numero di immagini inferiore a min_images vengono scartate.
+    :param n_cat:               per selezionare solo le n_cat classi più rappresentate.
     :return useful_listings:    dataframe contenente le inserzioni rilevanti
     """
+    # apro tutti i file delle annotazioni, che sono divisi in più archivi, e li unisco in un unico dataframe
     listings = os.listdir(listings_dir)
     useful_listings = pd.DataFrame()
     n_listings = len(listings)
@@ -59,15 +67,17 @@ def get_useful_listings(listings_dir: Path, dest_dir: Path, imgs_metadata: pd.Da
         data = data[['item_id', 'product_type', 'main_image_id', 'other_image_id']]
         # estraggo i dati che mi servono in un formato più leggibile
         data['product_type'] = data['product_type'].apply(lambda x: x[0]['value'])
+        # sostituisco i valori nan con liste vuote
         data['other_image_id'] = data['other_image_id'].apply(lambda x: [] if x is np.nan
                                                               else [i for i in x if i in useful_index])
-        # per mettere tutti gli image_id associati a un prodotto nella stessa lista
+        # per mettere tutti gli image_id associati a un prodotto nella stessa lista, di default l'immagine principale
+        # è salvata nella colonna 'main_image_id' mentre le altre sono in una lista sotto la colonna 'other_image_id'
         data.apply(lambda x: x['other_image_id'].append(x['main_image_id']) if x['main_image_id'] in useful_index
                    else x['other_image_id'], axis=1)
-        data.rename(columns={'other_image_id': 'image_id'}, inplace=True)
+        data.rename(columns={'other_image_id': 'image_id'}, inplace=True)   # scarto la colonna perchè non serve più
         data.drop(columns='main_image_id', inplace=True)
         data['image_id'] = data['image_id'].apply(lambda x: tuple(x))
-        useful_listings = pd.concat([useful_listings, data], ignore_index=True)
+        useful_listings = pd.concat([useful_listings, data], ignore_index=True)     # metto tutto in unico dataframe
 
     # alcune inserzioni hanno i metadati in più lingue, quindi ci sono delle righe duplicate ma questi a noi non
     # interessano quindi li scartiamo
@@ -75,10 +85,11 @@ def get_useful_listings(listings_dir: Path, dest_dir: Path, imgs_metadata: pd.Da
     # dato che alcune inserzioni usano immagini stock comuni, rimuovo quelle che si ripetono
     useful_listings = useful_listings.explode('image_id')
     useful_listings.drop_duplicates(subset='image_id', keep=False, inplace=True, ignore_index=True)
-    # tolgo le inserzioni con meno di --folds immagini, per farlo raggruppo nuovamente per 'item_id' e 'product_type'
-    useful_listings = useful_listings.groupby(['item_id', 'product_type']).agg({'image_id': lambda x: x.to_list()})
+    # tolgo le inserzioni con meno di min_images immagini, per farlo raggruppo nuovamente per 'item_id' e 'product_type'
+    useful_listings = useful_listings.groupby(['item_id', 'product_type']).agg({'image_id': lambda x: x.tolist()})
     useful_listings.reset_index(inplace=True)
-    useful_listings = useful_listings[useful_listings['image_id'].str.len() >= args.min_images]
+    # dopo aver rimesso tutte le immagini di un prodotto in una lista, scarto quelli con meno di min_images
+    useful_listings = useful_listings[useful_listings['image_id'].str.len() >= min_images]
     useful_listings.reset_index(drop=True, inplace=True)
 
     # adesso scrivo i metadati rimasti nella loro forma finale, usando come index la 'image_id' e integrando le
@@ -86,18 +97,19 @@ def get_useful_listings(listings_dir: Path, dest_dir: Path, imgs_metadata: pd.Da
     useful_listings = useful_listings.explode('image_id').set_index('image_id')
     useful_listings = useful_listings.merge(imgs_metadata, how='left', on='image_id')
 
-    # adesso vanno selezionate le immagini delle --n-cat classi più rappresentate
+    # adesso vanno selezionate le immagini delle n_cat classi più rappresentate
     # value_counts restituisce una serie con il numero di volte in cui un'entrata compare nella colonna 'product_type'
     # in ordine decrescente, le classi selezionate saranno dunque gli indici di questa serie
-    top_n = useful_listings['product_type'].value_counts()[0: args.n_cat]
-    top_n_classes = top_n.index.to_list()
-    top_n_imgs_per_class = top_n.to_list()
+    top_n = useful_listings['product_type'].value_counts()[0: n_cat]
+    top_n_classes = top_n.index.tolist()
+    top_n_imgs_per_class = top_n.tolist()
+    # tengo solo le inserzioni il cui 'product_type' è tra i top_n
     useful_listings = useful_listings[useful_listings['product_type'].isin(top_n_classes)]
 
     # essendo molto sbilanciato, andremo a fare un subsampling delle classi più rappresentate, per evitare di tenere
-    # nel dataset prodotti con meno di --min-images immagini, faremo il sampling sui prodotti invece che sulle immagini
+    # nel dataset prodotti con meno di min_images immagini, faremo il sampling sui prodotti invece che sulle immagini
     avg = int(np.mean(top_n_imgs_per_class))     # numero medio di immagini in ciascuna delle top_n classi
-    product_kept = []   # lista dei product id da tenere nel subset
+    product_kept = []   # lista degli item_id da tenere nel subset
     for _class, _n_imgs in zip(top_n_classes, top_n_imgs_per_class):
         # filtro il dataframe per tenere solo le righe della specifica classe
         _class_listings = useful_listings[useful_listings['product_type'] == _class]
@@ -160,40 +172,43 @@ def save_images(imgs_dir: Path, dest_dir: Path, metadata: pd.DataFrame, args: ar
         cv2.imwrite(str(dest_fname), resized)
 
 
-
 def main(args):
     # definizione dei percorsi
     pd.set_option('display.max_columns', None)
-    root = Path(args.root)
-    dest_dir = Path(args.dest)
-    listings_dir = root / 'abo-listings/listings/metadata'
-    imgs_dir = root / 'abo-images-small/images/small'
+    ROOT = Path(args.root)  # root del dataset
+    DEST = Path(args.dest)  # cartella di destinazione del subset
+    RATIO = args.ratio  # aspect ratio secondo cui scartare le immagini (spiego meglio in drop_by_ratio())
+    SIZE = args.size    # dimensione a cui eseguire il resize dell'immagine
+    MIN_IMAGES = args.min_images    # numero di immagini minimo per tenere un prodotto
+    N_CAT = args.n_cat  # numero di categorie merceologiche da tenere
+    listings_dir = ROOT / 'abo-listings/listings/metadata'  # cartella delle annotazioni
+    imgs_dir = ROOT / 'abo-images-small/images/small'   # cartella in cui salvare le immagini modificate
 
-    imgs_metadata = pd.read_csv(root / 'abo-images-small/images/metadata/fixed_images.csv', index_col='image_id')
+    # leggo il csv corretto usando fix_csv.py
+    imgs_metadata = pd.read_csv(ROOT / 'abo-images-small/images/metadata/fixed_images.csv', index_col='image_id')
     # filtro le immagini secondo l'aspect ratio desiderata
-    imgs_metadata = drop_by_ratio(imgs_metadata, args)
+    imgs_metadata = drop_by_ratio(imgs_metadata, RATIO)
     # print(imgs_metadata)
-
     # vengono filtrate le immagini e creato il file di annotazioni del subset
-    metadata = get_useful_listings(listings_dir, dest_dir, imgs_metadata, args)
+    metadata = get_useful_listings(listings_dir, DEST, imgs_metadata, MIN_IMAGES, N_CAT)
     # print(metadata)
-
     # metadata = pd.read_csv(dest_dir / 'subset_images.csv', index_col='image_id')
-    save_images(imgs_dir, dest_dir, metadata, args)
+    # salva le immagini rimaste nel file csv del subset
+    save_images(imgs_dir, DEST, metadata, args)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Data Preprocessing',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('--root', type=str, default=r'C:\Users\rx571gt-b034t\Desktop\PROJECT\ABO_DATASET',
+                        help='Root del dataset.')
+    parser.add_argument('--dest', type=str, default=r'C:\Users\rx571gt-b034t\Desktop\PROJECT\subset_10',
+                        help='Directory in cui salvare il dataset preprocessato.')
     parser.add_argument('--ratio', type=int, default=5, help='Soglia per scartare le immagini con rapporto '
                                                              'max_dim/min_dim superiore a quello indicato.')
     parser.add_argument('--size', type=int, default=224, help='Dimensione finale delle immagini (quadrate).')
     parser.add_argument('--min-images', type=int, default=5, help='Scarta le inserzioni con un numero di immagini '
                                                                   'inferiore per poter fare crossvalidation.')
     parser.add_argument('--n-cat', type=int, default=10, help='Per selezionare solo le classi più rappresentate.')
-    parser.add_argument('--root', type=str, default=r'C:\Users\rx571gt-b034t\Desktop\PROJECT\ABO_DATASET',
-                        help='Root del dataset.')
-    parser.add_argument('--dest', type=str, default=r'C:\Users\rx571gt-b034t\Desktop\PROJECT\subset_10',
-                        help='Directory in cui salvare il dataset preprocessato.')
     arguments = parser.parse_args()
     main(arguments)

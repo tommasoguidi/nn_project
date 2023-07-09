@@ -12,9 +12,15 @@ rimpicciolite affinché la dimensione massima non superasse 256
 pixel. Il file `images.csv` riporta valori sbagliati delle dimensioni delle
 immagini. La correzione è un processo lungo che richiede l'apertura di
 tutte le immagini, pertanto è stata fatta una volta per tutte usando
-lo script `fix_csv.py` che prende come argomento la `--file-dir`
+lo script `fix_csv.py`.
+
+### `fix_csv.py`
+Lo script prende come argomento la `--file-dir`
 del file e la `--imgs-dir` contenente le immagini, lo corregge e lo
 salva come `fixed_images.csv`.
+
+### `prepare_dataset.py`
+Questo script svolge
 
 Di seguito la lista delle operazioni di preprocessing
 svolte da `prepare_dataset.py` con i rispettivi parametri che possono
