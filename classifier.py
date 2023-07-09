@@ -420,7 +420,7 @@ def main(args):
     WEIGHTS = Path(args.weights)
 
     assert MODE in ['train', 'eval'], '--mode deve essere uno tra "train" e "eval".'
-    assert DEVICE in ['cuda', 'gpu'], '--device deve essere uno tra "cuda" e "gpu".'
+    assert DEVICE in ['cuda', 'cpu'], '--device deve essere uno tra "cuda" e "cpu".'
     assert BACKBONE in ['cnn', 'resnet'], 'le --backbone disponibili sono: "cnn" e "resnet".'
 
     if BACKBONE == 'resnet':

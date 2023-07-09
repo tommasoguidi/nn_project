@@ -740,7 +740,7 @@ def main(args):
     WEIGHTS = Path(args.weights)
 
     assert MODE in ['train', 'eval'], '--mode deve essere uno tra "train" e "eval".'
-    assert DEVICE in ['cuda', 'gpu'], '--device deve essere uno tra "cuda" e "gpu".'
+    assert DEVICE in ['cuda', 'cpu'], '--device deve essere uno tra "cuda" e "cpu".'
     assert METHOD in ['naive', 'moe'], 'scegliere --head "naive" se si vuole semplicemente avere tanti output neurons' \
                                        ' quanti sono gli oggetti oppure "moe" per usare un ensemble di classificatori' \
                                        ' specifici ciascuno per ogni categoria merceologica.'
