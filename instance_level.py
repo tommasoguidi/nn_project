@@ -222,8 +222,6 @@ class MoE(nn.Module):
         super().__init__()
         self.num_super_classes = num_super_classes
         self.len_item_classes = len_item_classes
-        print(self.num_super_classes)
-        print(self.len_item_classes)
         # metto la mia resnet con forward modificato
         self.resnet = MyResNet(num_super_classes=self.num_super_classes)
         # creo un'istanza della classe Head() per ogni super classe e la aggiungo alla ModuleList
@@ -486,8 +484,6 @@ class Classifier:
             batch_item_loss = 0.0
 
             images, super_class_labels, item_labels = sample
-            print(super_class_labels)
-            print(item_labels)
             batch_cases = images.shape[0]  # numero di sample nel batch
             tot_cases += batch_cases  # accumulo il numero totale di esempi
             # adesso il problema è che per ogni esempio l'architettura della rete cambia, quindi per aggiornare i
@@ -784,8 +780,6 @@ def main(args):
             # cambiate in precedenza
             val_ds = split  # split è il dataset che sto usando come validation
             class_mapping = val_ds.mapping
-            print(len(class_mapping))
-            print([len(class_mapping[key]) - 1 for key in class_mapping])
             val_ds.set_transforms(val_transforms)
             val_loader = DataLoader(val_ds, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS)
 
@@ -794,8 +788,6 @@ def main(args):
             train_datasets = [j for j in splits if j is not split]  # come train uso gli altri, unendoli con Concat
             for d in train_datasets:
                 d.set_transforms(train_transforms)
-                print(len(d.mapping))
-                print([len(d.mapping[key]) - 1 for key in d.mapping])
             train_ds = Concat(train_datasets)
             train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
 
