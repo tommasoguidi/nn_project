@@ -531,13 +531,13 @@ class Classifier:
 
             # accumulo le metriche di interesse
             epoch_class_loss += batch_class_loss
-            class_bool = batch_class_decisions == super_class_labels
+            class_bool = batch_class_decisions == super_class_labels.to(self.device)
             batch_class_correct = torch.sum(class_bool)
             epoch_class_correct += batch_class_correct.item()
 
             epoch_item_loss += batch_item_loss
             # la classificazione del prodotto è corretta se lo era anche quella della super class
-            item_bool = (batch_item_decisions == item_labels)
+            item_bool = (batch_item_decisions == item_labels.to(self.device))
             batch_item_correct = torch.sum(torch.logical_and(class_bool, item_bool))
             epoch_item_correct += batch_item_correct.item()
 
