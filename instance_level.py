@@ -231,9 +231,8 @@ class MoE(nn.Module):
         # e come classes il numero dei prodotti appartenenti alla i-esima super class
         self.heads = nn.ModuleList([Head(2048, self.len_item_classes[i]) for i in range(self.num_super_classes)])
         print(f'in tutto ho {len(self.heads)}')
-        # for i in self.heads:
-        #     print(f'testa')
-        #     print(summary(i, (1, 2048)))
+        for i in self.heads:
+            print(summary(i, (1, 2048)))
 
     def forward(self, x):
         # il metodo forward() di resnet è stato modificato per ritornare anche il feature vector
@@ -511,23 +510,23 @@ class Classifier:
                 batch_item_decisions.append(item_decision)
 
                 # loss del batch e backward step
-                try:
-                    super_class_loss = criterion(super_class_logit, super_class_label)    # loss sulle classi
-                    batch_class_loss += super_class_loss
-                    item_loss = criterion(item_logit, item_label)   # loss sui prodotti
-                    batch_item_loss += item_loss
-                    # loss totale, aggiungo enfasi alla class loss perchè determina in cascata la possibilità
-                    # di classificare corretttamente il prodotto
-                    total_loss = 2.0 * super_class_loss + item_loss
-                    total_loss.backward()
-                except:
-                    print(f'super_class_logit = {super_class_logit}')
-                    print(f'super_class_label = {super_class_label}')
-                    print(f'super_class_logit = {super_class_logit.size()}')
-                    print(f'super_class_label = {super_class_label.size()}')
-                    print(f'item_label = {item_label}')
-                    print(f'item_logit = {item_logit.size()}')
-                    print(f'item_label = {item_label.size()}')
+
+                super_class_loss = criterion(super_class_logit, super_class_label)    # loss sulle classi
+                batch_class_loss += super_class_loss
+                item_loss = criterion(item_logit, item_label)   # loss sui prodotti
+                batch_item_loss += item_loss
+                # loss totale, aggiungo enfasi alla class loss perchè determina in cascata la possibilità
+                # di classificare corretttamente il prodotto
+                total_loss = 2.0 * super_class_loss + item_loss
+                total_loss.backward()
+                # except:
+                #     print(f'super_class_logit = {super_class_logit}')
+                #     print(f'super_class_label = {super_class_label}')
+                #     print(f'super_class_logit = {super_class_logit.size()}')
+                #     print(f'super_class_label = {super_class_label.size()}')
+                #     print(f'item_label = {item_label}')
+                #     print(f'item_logit = {item_logit.size()}')
+                #     print(f'item_label = {item_label.size()}')
 
             # aggiorno i pesi
             optimizer.step()
