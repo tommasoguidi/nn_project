@@ -231,7 +231,7 @@ class MoE(nn.Module):
         # e come classes il numero dei prodotti appartenenti alla i-esima super class
         self.heads = nn.ModuleList([Head(2048, self.len_item_classes[i]) for i in range(self.num_super_classes)])
         for i in self.heads:
-            print(i.size())
+            print(summary(i, (1, 2048)))
 
     def forward(self, x):
         # il metodo forward() di resnet è stato modificato per ritornare anche il feature vector
