@@ -233,17 +233,14 @@ class MoE(nn.Module):
         # il metodo forward() di resnet è stato modificato per ritornare anche il feature vector
         super_class_logits, feature_vector = self.resnet.forward(x)
         super_class_output = F.softmax(super_class_logits, dim=1)  # class probabilities
-        # ciclo su ogni risultato e lo indirizzo alla testa giusta
-        # all_item_logits = ()
-        # all_item_outputs = ()
-        # for i, decision in enumerate(super_class_decision):
-        # prendo una per una le encoding delle immagini
+        super_class_decision = torch.argmax(super_class_output)
         feature_encoding = feature_vector
         # la indirizzo alla testa scelta da decision
-        item_logits = self.heads[super_class.item()].forward(feature_encoding)
-        # all_item_logits += (item_logits,)
+        if super_class is not None:
+            item_logits = self.heads[super_class.item()].forward(feature_encoding)
+        else:
+            item_logits = self.heads[super_class_decision.item()].forward(feature_encoding)
         item_output = F.softmax(item_logits, dim=1)  # class probabilities
-        # all_item_outputs += (item_outputs,)
 
         return super_class_logits, super_class_output, item_logits, item_output
 
@@ -570,7 +567,7 @@ class Classifier:
         self.model.eval()  # passa in modalità eval
 
         n_batches = len(dataloader)
-        progress = tqdm(dataloader, total=n_batches, leave=False, desc='EPOCH')
+        progress = tqdm(dataloader, total=n_batches, leave=False, desc='EVAL')
         epoch_class_loss = 0.0  # inizializzo la loss delle superclassi
         epoch_class_correct = 0  # prediction corrette della rete per calcolare l'accuracy sulle superclassi
         epoch_item_loss = 0.0  # inizializzo la loss dei prodotti
@@ -651,30 +648,46 @@ class Classifier:
         self.model.eval()  # passa in modalità eval
 
         n_batches = len(dataloader)
-        progress = tqdm(dataloader, total=n_batches, leave=False, desc='EPOCH')
+        progress = tqdm(dataloader, total=n_batches, leave=False, desc='EVAL')
         class_correct = 0  # prediction corrette della rete per calcolare l'accuracy sulle superclassi
         item_correct = 0  # segno le prediction corrette della rete per poi calcolare l'accuracy sui prodotti
         tot_cases = 0  # counter dei casi totali (sarebbe la len(dataset_train))
         for sample in progress:
+            class_decisions = []
+            item_decisions = []
+
             images, super_class_labels, item_labels = sample
-            images = images.to(self.device)
-            super_class_labels = super_class_labels.to(self.device)
-            item_labels = item_labels.to(self.device)
-
             batch_cases = images.shape[0]  # numero di sample nel batch
-            tot_cases += batch_cases  # accumulo il numero totale di sample
+            tot_cases += batch_cases  # accumulo il numero totale di esempi
+            # adesso il problema è che per ogni esempio l'architettura della rete cambia, quindi per aggiornare i
+            # gradienti non mi viene in mente altro che ciclare sui vari esempi, facendo lo step alla fine del ciclo
+            # in modo da preservare la batch_mode
+            for image, _, _ in zip(images, super_class_labels, item_labels):
+                image = torch.unsqueeze(image.to(self.device), dim=0)
+                # output della rete, a questo giro come superclass prendo la prediction fatta dalla backbone
+                super_class_logit, super_class_output, item_logit, item_output = self.forward(image, None)
+                # il risultato di softmax viene interpretato con politica winner takes all
+                super_class_decision = torch.argmax(super_class_output)  # adesso l'argomento è un vettore, non un batch
+                class_decisions.append(super_class_decision)
+                item_decision = torch.argmax(item_output)
+                item_decisions.append(item_decision)
 
-            # outputs della rete
-            super_class_logits, super_class_outputs, item_logits, item_outputs = self.forward(images)
-            # il risultato di softmax viene interpretato con politica winner takes all
-            batch_class_decisions = torch.argmax(super_class_outputs, dim=1)
-            batch_item_decisions = torch.argmax(item_outputs, dim=1)
+            # trasformo in tensori le liste in cui ho accumulato le varie loss
+            class_decisions = torch.tensor(class_decisions, device=self.device)
+            item_decisions = torch.tensor(item_decisions, device=self.device)
 
-            # conto le risposte corrette
-            class_correct += torch.sum(batch_class_decisions == super_class_labels)  # totale risposte corrette
-            item_correct += torch.sum((batch_class_decisions == super_class_labels) and (batch_item_decisions == item_labels))
+            # accumulo le metriche di interesse
+            class_bool = class_decisions == super_class_labels.to(self.device)
+            batch_class_correct = torch.sum(class_bool)
+            class_correct += batch_class_correct.item()
+
+            # la classificazione del prodotto è corretta se lo era anche quella della super class
+            item_bool = (item_decisions == item_labels.to(self.device))
+            batch_item_correct = torch.sum(torch.logical_and(class_bool, item_bool))
+            item_correct += batch_item_correct.item()
+
         class_accuracy = (class_correct / tot_cases) * 100.0  # accuracy sull'epoca (%)
-        item_accuracy = (item_correct / tot_cases) * 100.0
+        item_accuracy = (item_correct / tot_cases) * 100.0  # accuracy sull'epoca (%)
 
         return class_accuracy, item_accuracy
 
@@ -814,13 +827,16 @@ def main(args):
             train_result = cls.train(train_loader, val_loader, i, EPOCHS, LR)      # alleno
             best_results.append(train_result)
 
-        for i, r in enumerate(best_results):
-            print(f'Fold {i+1}: miglior accuratezza raggiunta dopo {r["epoch"]} epoche pari al {r["accuracy"]}%.')
         if METHOD == 'naive':
+            for i, r in enumerate(best_results):
+                print(f'Fold {i + 1}: miglior accuratezza raggiunta dopo {r["epoch"]} epoche pari al {r["accuracy"]}%.')
             accuracies = [r["accuracy"] for r in best_results]  # elenco le best_accuracy di ogni fold per la media
             mean_accuracy = np.mean(accuracies)
             print(f'Accuracy media: {mean_accuracy}')
         else:
+            for i, r in enumerate(best_results):
+                print(f'Fold {i + 1}: miglior accuratezza raggiunta dopo {r["epoch"]} epoche. Class accuracy pari al '
+                      f'{r["class_accuracy"]}%, item accuracy pari al {r["item_accuracy"]}%.')
             class_accuracies = [r["class_accuracy"] for r in best_results]
             mean_class_accuracy = np.mean(class_accuracies)
             print(f'Class accuracy media: {mean_class_accuracy}')
