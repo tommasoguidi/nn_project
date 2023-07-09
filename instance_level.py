@@ -480,6 +480,7 @@ class Classifier:
         epoch_item_correct = 0  # segno le prediction corrette della rete per poi calcolare l'accuracy sui prodotti
         tot_cases = 0       # counter dei casi totali (sarebbe la len(dataset_train))
         for sample in progress:
+            print(sample)
             batch_class_decisions = []
             batch_item_decisions = []
             batch_class_loss = 0.0
