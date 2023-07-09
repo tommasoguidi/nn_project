@@ -230,15 +230,11 @@ class MoE(nn.Module):
         # la i-esima istanza ha come in_features la dimensione delle feature uscenti dalla resnet dopo flatten() (2048)
         # e come classes il numero dei prodotti appartenenti alla i-esima super class
         self.heads = nn.ModuleList([Head(2048, self.len_item_classes[i]) for i in range(self.num_super_classes)])
-        print(f'in tutto ho {len(self.heads)}')
-        for i in self.heads:
-            print(summary(i, (1, 2048)))
 
-    def forward(self, x):
+    def forward(self, x, super_class):
         # il metodo forward() di resnet è stato modificato per ritornare anche il feature vector
         super_class_logits, feature_vector = self.resnet.forward(x)
         super_class_output = F.softmax(super_class_logits, dim=1)  # class probabilities
-        super_class_decision = torch.argmax(super_class_output, dim=1)  # questo è un tensore di dimensione batch_size
         # ciclo su ogni risultato e lo indirizzo alla testa giusta
         # all_item_logits = ()
         # all_item_outputs = ()
@@ -246,7 +242,7 @@ class MoE(nn.Module):
         # prendo una per una le encoding delle immagini
         feature_encoding = feature_vector
         # la indirizzo alla testa scelta da decision
-        item_logits = self.heads[super_class_decision.item()].forward(feature_encoding)
+        item_logits = self.heads[super_class.item()].forward(feature_encoding)
         # all_item_logits += (item_logits,)
         item_output = F.softmax(item_logits, dim=1)  # class probabilities
         # all_item_outputs += (item_outputs,)
@@ -311,11 +307,12 @@ class Classifier:
         self.model.load_state_dict(model_state["model"])
         self.model.to(self.device)
 
-    def forward(self, x: torch.Tensor):
+    def forward(self, x: torch.Tensor, super_class):
         """
         Forward step della rete.
 
         :param x:           esempio di input.
+        :param super_class: ground truth della super class.
         :return logits:     output prima della softmax (ci serve per calcolare la loss).
         :return outputs:    output della rete (class probabilities).
         """
@@ -326,7 +323,7 @@ class Classifier:
             return logits, outputs
         else:
             # nel caso stia usando MoE ho già implementato il forward
-            return self.model.forward(x)
+            return self.model.forward(x, super_class)
 
     def train_naive_one_epoch(self, dataloader, epoch, optimizer, criterion, writer):
         """
@@ -355,7 +352,7 @@ class Classifier:
             tot_cases += batch_cases  # accumulo il numero totale di sample
 
             # output della rete
-            logits, outputs = self.forward(images)
+            logits, outputs = self.forward(images, super_class=None)    # tanto qui la super class non serve
             # il risultato di softmax viene interpretato con politica winner takes all
             batch_decisions = torch.argmax(outputs, dim=1)
 
@@ -405,7 +402,7 @@ class Classifier:
             tot_cases += batch_cases  # accumulo il numero totale di sample
 
             # outputs della rete
-            logits, outputs = self.forward(images)
+            logits, outputs = self.forward(images, super_class=None)    # tanto qui la super class non serve
             # il risultato di softmax viene interpretato con politica winner takes all
             batch_decisions = torch.argmax(outputs, dim=1)
 
@@ -450,7 +447,7 @@ class Classifier:
             tot_cases += batch_cases  # accumulo il numero totale di sample
 
             # outputs della rete
-            _, outputs = self.forward(images)
+            _, outputs = self.forward(images, super_class=None)    # tanto qui la super class non serve
             # il risultato di softmax viene interpretato con politica winner takes all
             batch_decisions = torch.argmax(outputs, dim=1)
 
@@ -501,7 +498,7 @@ class Classifier:
                 super_class_label = torch.unsqueeze(super_class_label.to(self.device), dim=0)
                 item_label = torch.unsqueeze(item_label.to(self.device), dim=0)
                 # output della rete
-                super_class_logit, super_class_output, item_logit, item_output = self.forward(image)
+                super_class_logit, super_class_output, item_logit, item_output = self.forward(image, super_class_label)
 
                 # il risultato di softmax viene interpretato con politica winner takes all
                 super_class_decision = torch.argmax(super_class_output)   # adesso l'argomento è un vettore, non un batch
