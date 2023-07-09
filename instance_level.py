@@ -290,16 +290,19 @@ class Classifier:
         self.device = device
         self.ckpt_dir = ckpt_dir
         self.model = None
-        self.num_super_classes = len(mapping)   # numero delle superclassi
-        # lista con il numero di sottoclassi per ogni superclasse (-1 perchè va scartato l'identifier della superclasse)
-        self.len_item_classes = [len(mapping[key]) - 1 for key in mapping]
+        if self.method == 'naive':
+            self.num_classes = len(mapping)
+        else:
+            self.num_super_classes = len(mapping)   # numero delle superclassi
+            # lista con il numero di sottoclassi per ogni superclasse (-1 perchè va scartato l'identifier della superclasse)
+            self.len_item_classes = [len(mapping[key]) - 1 for key in mapping]
 
         if self.method == 'naive':
             # carico il modello di resnet50 senza pretrain
             self.model = resnet50()
             # prima di caricare i pesi del classificatore allenato lo devo modificare come era stato fatto
             # in precedenza, quindi modifico il layer finale della resnet
-            self.model.fc = nn.Linear(2048, self.num_super_classes)
+            self.model.fc = nn.Linear(2048, 10)
             self.load(weights)
             # # congelo i parametri per allenare solo il layer finale
             # for p in self.model.parameters():
@@ -310,7 +313,7 @@ class Classifier:
                 for p in b.parameters():
                     p.requires_grad = False
             # layer finale, a questo giro tanti neuroni quanto il numero di singoli prodotti
-            self.model.fc = nn.Linear(2048, sum(self.len_item_classes))
+            self.model.fc = nn.Linear(2048, self.num_classes)
 
         else:
             # carico il modello pretrainato di resnet50 su imagenet
