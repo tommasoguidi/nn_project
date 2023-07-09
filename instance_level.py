@@ -507,14 +507,21 @@ class Classifier:
                 batch_item_decisions.append(item_decision)
 
                 # loss del batch e backward step
-                super_class_loss = criterion(super_class_logit, super_class_label)    # loss sulle classi
-                batch_class_loss += super_class_loss
-                item_loss = criterion(item_logit, item_label)   # loss sui prodotti
-                batch_item_loss += item_loss
-                # loss totale, aggiungo enfasi alla class loss perchè determina in cascata la possibilità
-                # di classificare corretttamente il prodotto
-                total_loss = 2.0 * super_class_loss + item_loss
-                total_loss.backward()
+                try:
+                    super_class_loss = criterion(super_class_logit, super_class_label)    # loss sulle classi
+                    batch_class_loss += super_class_loss
+                    item_loss = criterion(item_logit, item_label)   # loss sui prodotti
+                    batch_item_loss += item_loss
+                    # loss totale, aggiungo enfasi alla class loss perchè determina in cascata la possibilità
+                    # di classificare corretttamente il prodotto
+                    total_loss = 2.0 * super_class_loss + item_loss
+                    total_loss.backward()
+                except:
+                    print(f'super_class_logit = {super_class_logit}')
+                    print(f'super_class_label = {super_class_label}')
+                    print(f'item_logit = {item_logit}')
+                    print(f'item_label = {item_label}')
+
             # aggiorno i pesi
             optimizer.step()
             optimizer.zero_grad()
@@ -666,7 +673,7 @@ class Classifier:
         optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.model.parameters()), lr)
         # impostiamo la crossentropy loss con reduction='sum' in modo da poter sommare direttamente le loss di ogni
         # batch e dividerle a fine epoca per ottenere la loss
-        criterion = nn.CrossEntropyLoss(reduction='sum').to(self.device)
+        criterion = nn.CrossEntropyLoss(reduction='sum')
         ckpt_dir = self.ckpt_dir / f'fold_{split}'
         progress = tqdm(range(epochs), total=epochs, leave=False, desc='FOLD')
         # creo un summary writer per salvare le metriche (loss e accuracy)
