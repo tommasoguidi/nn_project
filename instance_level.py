@@ -664,7 +664,7 @@ class Classifier:
         optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.model.parameters()), lr)
         # impostiamo la crossentropy loss con reduction='sum' in modo da poter sommare direttamente le loss di ogni
         # batch e dividerle a fine epoca per ottenere la loss
-        criterion = nn.CrossEntropyLoss(reduction='sum')
+        criterion = nn.CrossEntropyLoss(reduction='none')
         ckpt_dir = self.ckpt_dir / f'fold_{split}'
         progress = tqdm(range(epochs), total=epochs, leave=False, desc='FOLD')
         # creo un summary writer per salvare le metriche (loss e accuracy)
