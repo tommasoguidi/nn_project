@@ -308,6 +308,8 @@ class Classifier:
             #         p.requires_grad = False
             # layer finale, a questo giro tanti neuroni quanto il numero di singoli prodotti
             self.model.fc = nn.Linear(2048, self.num_classes)
+            # stampa a schermo la rete
+            summary(self.model, input_size=(1, 3, 224, 224))
 
         else:
             self.num_super_classes = len(mapping)  # numero delle superclassi
@@ -315,9 +317,9 @@ class Classifier:
             self.len_item_classes = [len(mapping[key]) - 1 for key in mapping]
             # carico il modello pretrainato di resnet50 su imagenet
             self.model = MoE(self.num_super_classes, self.len_item_classes, pretrained, weights, self.device)
+            # stampa a schermo la rete
+            summary(self.model, input_size=(1, 3, 224, 224), super_class=1)
 
-        # # stampa a schermo la rete
-        summary(self.model, input_size=(1, 3, 224, 224))
         self.model.to(self.device)
 
     def load(self, weights: Path):
