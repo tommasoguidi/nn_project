@@ -320,7 +320,7 @@ class Classifier:
             self.model = MoE(self.num_super_classes, self.len_item_classes, pretrained, weights, self.device)
 
         # # stampa a schermo la rete
-        # summary(self.model, input_size=(1, 3, 224, 224))
+        summary(self.model, input_size=(1, 3, 224, 224))
         self.model.to(self.device)
 
     def load(self, weights: Path):
@@ -395,7 +395,7 @@ class Classifier:
             epoch_correct += batch_correct.item()      # totale risposte corrette sull'epoca
 
             postfix = {'batch_mean_loss': batch_loss.item()/batch_cases,
-                       'batch_accuracy': batch_correct.item()/batch_cases}
+                       'batch_accuracy': (batch_correct.item()/batch_cases) * 100.0}
             progress.set_postfix(postfix)
 
         epoch_mean_loss = epoch_loss / tot_cases        # loss media sull'epoca
@@ -571,9 +571,9 @@ class Classifier:
             epoch_item_correct += batch_item_correct.item()
 
             postfix = {'batch_mean_class_loss': (batch_class_loss / batch_cases).item(),
-                       'batch_class_accuracy': batch_class_correct.item() / batch_cases,
+                       'batch_class_accuracy': (batch_class_correct.item() / batch_cases) * 100.0,
                        'batch_mean_item_loss': (batch_item_loss / batch_cases).item(),
-                       'batch_item_accuracy': batch_item_correct.item() / batch_cases}
+                       'batch_item_accuracy': (batch_item_correct.item() / batch_cases) * 100.0}
             progress.set_postfix(postfix)
 
         epoch_mean_class_loss = epoch_class_loss / tot_cases        # loss media sull'epoca
@@ -653,9 +653,9 @@ class Classifier:
             epoch_item_correct += batch_item_correct.item()
 
             postfix = {'batch_mean_class_loss': (batch_class_loss / batch_cases).item(),
-                       'batch_class_accuracy': batch_class_correct.item() / batch_cases,
+                       'batch_class_accuracy': (batch_class_correct.item() / batch_cases) * 100.0,
                        'batch_mean_item_loss': (batch_item_loss / batch_cases).item(),
-                       'batch_item_accuracy': batch_item_correct.item() / batch_cases}
+                       'batch_item_accuracy': (batch_item_correct.item() / batch_cases) * 100.0}
             progress.set_postfix(postfix)
 
         epoch_mean_class_loss = epoch_class_loss / tot_cases  # loss media sull'epoca
@@ -845,6 +845,7 @@ def main(args):
             # cambiate in precedenza
             val_ds = split  # split è il dataset che sto usando come validation
             class_mapping = val_ds.mapping
+            print(class_mapping)
             val_ds.set_transforms(val_transforms)
             val_loader = DataLoader(val_ds, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS)
 
