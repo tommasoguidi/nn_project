@@ -845,7 +845,6 @@ def main(args):
             # cambiate in precedenza
             val_ds = split  # split è il dataset che sto usando come validation
             class_mapping = val_ds.mapping
-            print(class_mapping)
             val_ds.set_transforms(val_transforms)
             val_loader = DataLoader(val_ds, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS)
 
