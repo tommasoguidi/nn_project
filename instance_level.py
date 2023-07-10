@@ -318,7 +318,7 @@ class Classifier:
             # carico il modello pretrainato di resnet50 su imagenet
             self.model = MoE(self.num_super_classes, self.len_item_classes, pretrained, weights, self.device)
             # stampa a schermo la rete
-            summary(self.model, input_size=(1, 3, 224, 224), super_class=1)
+            # summary(self.model, input_size=(1, 3, 224, 224), super_class=1)
 
         self.model.to(self.device)
 
