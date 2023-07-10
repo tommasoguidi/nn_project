@@ -9,7 +9,7 @@ sempre diversi e si presta molto bene al task in questione.
 ## Dependencies
 Il progetto utilizza solo librerie molto comuni, come pytorch, numpy e
 pandas. L'elaborazione delle immagini è stata eseguita usando opencv. In
-ogni caso i file `requirements.txt` e `environment.yaml` permettono di
+ogni caso i file `requirements.txt` e `environment.yml` permettono di
 installare tutto quello che serve per far girare il codice, che usa la
 versione 3.10 di Python.
 
