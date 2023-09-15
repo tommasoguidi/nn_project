@@ -207,7 +207,7 @@ class Classifier:
             #     for p in b.parameters():
             #         p.requires_grad = False
             # layer finale
-            self.model.fc = nn.Linear(2048, self.outputs)
+            self.model.fc = nn.Linear(512, self.outputs)
 
         self.model.to(self.device)
         # # stampa a schermo la rete
