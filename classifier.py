@@ -198,6 +198,7 @@ class Classifier:
             # layer finale
             self.model.fc = nn.Linear(2048, self.outputs)
 
+        self.model.to(self.device)
         # # stampa a schermo la rete
         # summary(self.model, input_size=(1, 3, 224, 224))
 
