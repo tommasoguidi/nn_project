@@ -13,7 +13,7 @@ from torch.utils.tensorboard import SummaryWriter
 import torch.nn as nn
 import torch.nn.functional as F
 from torchvision.transforms import Compose, ToTensor, RandomHorizontalFlip, RandomAffine, Normalize
-from torchvision.models import resnet50
+from torchvision.models import resnet50, resnet18
 from torchinfo import summary
 
 
@@ -195,6 +195,17 @@ class Classifier:
             for b in blocks[:-3]:
                 for p in b.parameters():
                     p.requires_grad = False
+            # layer finale
+            self.model.fc = nn.Linear(2048, self.outputs)
+
+        elif backbone == 'resnet18':
+            # carico il modello pretrainato di resnet50 su imagenet
+            self.model = resnet18(weights='DEFAULT', progress=True)
+            # congelo i parametri tranne quelli degli ultimi 3 blocchi
+            # blocks = list(self.model.children())
+            # for b in blocks[:-3]:
+            #     for p in b.parameters():
+            #         p.requires_grad = False
             # layer finale
             self.model.fc = nn.Linear(2048, self.outputs)
 
@@ -430,7 +441,7 @@ def main(args):
 
     assert MODE in ['train', 'eval'], '--mode deve essere uno tra "train" e "eval".'
     assert DEVICE in ['cuda', 'cpu'], '--device deve essere uno tra "cuda" e "cpu".'
-    assert BACKBONE in ['cnn', 'resnet'], 'le --backbone disponibili sono: "cnn" e "resnet".'
+    assert BACKBONE in ['cnn', 'resnet', 'resnet18'], 'le --backbone disponibili sono: "cnn", "resnet" e "resnet18".'
 
     if BACKBONE == 'resnet':
         train_transforms = Compose([ToTensor(),
