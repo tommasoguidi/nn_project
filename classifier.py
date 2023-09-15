@@ -443,7 +443,7 @@ def main(args):
     assert DEVICE in ['cuda', 'cpu'], '--device deve essere uno tra "cuda" e "cpu".'
     assert BACKBONE in ['cnn', 'resnet', 'resnet18'], 'le --backbone disponibili sono: "cnn", "resnet" e "resnet18".'
 
-    if BACKBONE == 'resnet':
+    if BACKBONE in ['resnet', 'resnet18']:
         train_transforms = Compose([ToTensor(),
                                     RandomAffine(45, translate=(0.1, 0.1), scale=(0.8, 1.2), fill=255),
                                     RandomHorizontalFlip(p=0.5),
