@@ -115,3 +115,9 @@ caso è sempre ResNet;
 - `--pretrained` consente di specificare che MoE usi come faetures extractor
 la ResNet ottenuta al punto precedente e indicata da `--weights` (di default
 viene riallenato tutto insieme).
+
+## Few-Shot Learning
+
+Utilizzando il pacchetto easyfsl sono state testate le performance di alcuni
+modelli proposti per FSL (Matching/Relation/Prototype... Network). Il codice
+relativo alle prove è contenuto nel file `instance_level.py`

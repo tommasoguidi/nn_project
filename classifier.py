@@ -12,7 +12,7 @@ from torch.utils.data import Dataset, DataLoader
 from torch.utils.tensorboard import SummaryWriter
 import torch.nn as nn
 import torch.nn.functional as F
-from torchvision import transforms
+from torchvision.transforms import Compose, ToTensor, RandomHorizontalFlip, RandomAffine, Normalize
 from torchvision.models import resnet50
 from torchinfo import summary
 
@@ -22,7 +22,7 @@ class MyDataset(Dataset):
     Crea gli split del dataset. Per eseguire la cross validation, uno di questi dovrà essere usato come validation,
     gli altri devono essere uniti per ottenere il train usando la classe Concat.
     """
-    def __init__(self, path: Path, n_folds: int, split: int, mode: str, transforms: transforms.Compose):
+    def __init__(self, path: Path, n_folds: int, split: int, mode: str, transforms: Compose, seed: int):
         """
         Crea il dataset a partire dal percorso indicato.
 
@@ -31,6 +31,7 @@ class MyDataset(Dataset):
         :param split:       indice per identificare quale split stiamo usando.
         :param mode:        per dire se stiamo facendo 'train' o 'eval'.
         :param transforms:  le trasformazioni da applicare all'immagine.
+        :param seed:        per riproducibilità.
         """
         self.path = path
         self.img_dir = path / 'images'
@@ -38,6 +39,7 @@ class MyDataset(Dataset):
         self.n_folds = n_folds
         self.split = split
         self.mode = mode
+        self.seed = seed
         # in eval mode vogliamo usare il test set, che è stato ottenuto dalla coda del dataset totale (maggiori info
         # sotto _get_ids_in_split())
         if self.mode == 'eval':
@@ -86,6 +88,7 @@ class MyDataset(Dataset):
         for _class in self.all_classes:
             # metto in una lista tutti gli image_id di una determinata classe
             ids_in_class = self.annos.index[self.annos['product_type'] == _class].tolist()
+            random.seed(self.seed)
             random.shuffle(ids_in_class)
             # splitto in n_folds + 1 per avere un hold out su cui fare il test (l'ultimo degli split)
             ids_per_split = len(ids_in_class) // (self.n_folds + 1)     # n di immagini che metto nello split
@@ -416,27 +419,32 @@ def main(args):
     LR = args.lr
     CHECKPOINT_DIR = Path(args.checkpoint_dir)
     WEIGHTS = Path(args.weights)
+    SEED = args.seed
+
+    np.random.seed(SEED)
+    torch.manual_seed(SEED)
+    random.seed(SEED)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
     assert MODE in ['train', 'eval'], '--mode deve essere uno tra "train" e "eval".'
     assert DEVICE in ['cuda', 'cpu'], '--device deve essere uno tra "cuda" e "cpu".'
     assert BACKBONE in ['cnn', 'resnet'], 'le --backbone disponibili sono: "cnn" e "resnet".'
 
     if BACKBONE == 'resnet':
-        train_transforms = transforms.Compose([transforms.ToTensor(),
-                                               transforms.RandomAffine(45, translate=(0.1, 0.1),
-                                                                       scale=(0.8, 1.2), fill=255),
-                                               transforms.RandomHorizontalFlip(p=0.5),
-                                               transforms.Normalize(mean=torch.tensor([0.485, 0.456, 0.406]),
-                                                                    std=torch.tensor([0.229, 0.224, 0.225]))])
-        val_transforms = transforms.Compose([transforms.ToTensor(),
-                                             transforms.Normalize(mean=torch.tensor([0.485, 0.456, 0.406]),
-                                                                  std=torch.tensor([0.229, 0.224, 0.225]))])
+        train_transforms = Compose([ToTensor(),
+                                    RandomAffine(45, translate=(0.1, 0.1), scale=(0.8, 1.2), fill=255),
+                                    RandomHorizontalFlip(p=0.5),
+                                    Normalize(mean=torch.tensor([0.485, 0.456, 0.406]),
+                                              std=torch.tensor([0.229, 0.224, 0.225]))])
+        val_transforms = Compose([ToTensor(),
+                                  Normalize(mean=torch.tensor([0.485, 0.456, 0.406]),
+                                            std=torch.tensor([0.229, 0.224, 0.225]))])
     elif BACKBONE == 'cnn':
-        train_transforms = transforms.Compose([transforms.ToTensor(),
-                                               transforms.RandomAffine(45, translate=(0.1, 0.1),
-                                                                       scale=(0.8, 1.2), fill=255),
-                                               transforms.RandomHorizontalFlip(p=0.5)])
-        val_transforms = transforms.Compose([transforms.ToTensor()])
+        train_transforms = Compose([ToTensor(),
+                                    RandomAffine(45, translate=(0.1, 0.1), scale=(0.8, 1.2), fill=255),
+                                    RandomHorizontalFlip(p=0.5)])
+        val_transforms = Compose([ToTensor()])
 
     # train mode
     if MODE == 'train':
@@ -452,7 +460,7 @@ def main(args):
         splits = []     # qui salvo gli n_folds dataset che sono i singoli split
         best_results = []
         for i in tqdm(range(N_FOLDS), total=N_FOLDS, desc='Creo gli split del dataset.'):
-            splits.append(MyDataset(ROOT, N_FOLDS, i, mode=MODE, transforms=val_transforms))
+            splits.append(MyDataset(ROOT, N_FOLDS, i, mode=MODE, transforms=val_transforms, seed=SEED))
 
         for i, split in tqdm(enumerate(splits), total=N_FOLDS, desc='COMPLETED FOLDS'):
             # ciclicamente uso uno split come val, reimposto le transforms a val_transforms nel caso fossero state
@@ -485,7 +493,7 @@ def main(args):
         # del modello prescelto
         actual_dir = CHECKPOINT_DIR
         # per creare il dataset passo il parametro split ma non serve (__init__ lo setta a n_folds)
-        test_ds = MyDataset(ROOT, N_FOLDS, split=0, mode=MODE, transforms=val_transforms)
+        test_ds = MyDataset(ROOT, N_FOLDS, split=0, mode=MODE, transforms=val_transforms, seed=SEED)
         class_mapping = test_ds.mapping
         test_loader = DataLoader(test_ds, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS)
 
@@ -512,6 +520,7 @@ if __name__ == '__main__':
     parser.add_argument('--batch-size', type=int, default=16, help='Numero di esempi in ogni batch.')
     parser.add_argument('--num-workers', type=int, default=3, help='Numero di worker.')
     parser.add_argument('--lr', type=float, default=0.001, help='Learning rate.')
+    parser.add_argument('--seed', type=int, default=123, help='Per riproducibilità.')
     parser.add_argument('--checkpoint_dir', type=str, default='runs/classifier',
                         help='Cartella dove salvare i risultati dei vari esperimenti.')
     parser.add_argument('--weights', type=str, default='classifier.pth',
