@@ -361,6 +361,8 @@ class Classifier:
 
             # outputs della rete
             _, outputs = self.forward(images)
+            print(outputs.shape)
+            break
             # il risultato di softmax viene interpretato con politica winner takes all
             batch_decisions = torch.argmax(outputs, dim=1)
 
@@ -527,7 +529,8 @@ if __name__ == '__main__':
     parser.add_argument('--device', type=str, default='cuda',
                         help='Scegliere se usare la gpu ("cuda") o la "cpu".')
     parser.add_argument('-b', '--backbone', type=str, default='resnet',
-                        help='Scegliere se utilizzare una semplice "cnn" o la "resnet" come features extractor.')
+                        help='Scegliere se utilizzare una semplice "cnn", "resnet" (50) o "resnet18" '
+                             'come features extractor.')
     parser.add_argument('-e', '--epochs', type=int, default=25, help='Epoche per eseguire il train')
     parser.add_argument('--batch-size', type=int, default=16, help='Numero di esempi in ogni batch.')
     parser.add_argument('--num-workers', type=int, default=3, help='Numero di worker.')
