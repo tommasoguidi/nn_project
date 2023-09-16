@@ -351,6 +351,7 @@ class Classifier:
         n_batches = len(dataloader)
         progress = tqdm(dataloader, total=n_batches, leave=False, desc='TEST')
         correct = 0  # segno le prediction corrette della rete per poi calcolare l'accuracy
+        top3_count = 0
         tot_cases = 0  # counter dei casi totali (sarebbe la len(dataset_test))
         for sample in progress:
             images, labels = sample  # __getitem__ restituisce una tupla (image, label)
@@ -361,17 +362,20 @@ class Classifier:
 
             # outputs della rete
             _, outputs = self.forward(images)
-            print(outputs.shape)
-            break
             # il risultato di softmax viene interpretato con politica winner takes all
             batch_decisions = torch.argmax(outputs, dim=1)
+            top3_decisions = torch.topk(outputs, k=3, dim=1).indices    # stesso motivo per cui uso argmax
 
             # conto le risposte corrette
             correct += torch.sum(batch_decisions == labels)  # totale risposte corrette
+            # faccio la top3 accuracy
+            for gt, top3 in zip(labels, top3_decisions):
+                top3_count += int(torch.isin(gt, top3).item())
 
         accuracy = (correct / tot_cases) * 100.0  # accuracy sull'epoca (%)
+        top3_acc = (top3_count / tot_cases) * 100.0  # top3_accuracy sull'epoca (%)
 
-        return accuracy
+        return accuracy, top3_acc
 
     def train(self, train_loader: DataLoader, val_loader: DataLoader, split: int, epochs: int, lr: float):
         """
@@ -514,8 +518,9 @@ def main(args):
         cls = Classifier(BACKBONE, DEVICE, actual_dir, class_mapping)  # inizializzo il classificatore
         cls.load(WEIGHTS)
 
-        test_accuracy = cls.test(test_loader)
+        test_accuracy, top3_accuracy = cls.test(test_loader)
         print(f'Accuracy sui dati di test: {test_accuracy}')
+        print(f'Top3-Accuracy sui dati di test: {top3_accuracy}')
 
 
 if __name__ == '__main__':
