@@ -48,6 +48,7 @@ class MyDataset(Dataset):
         self.all_ids = self.annos.index.tolist()    # lista di tutti gli image_id
         self.all_classes = sorted(self.annos['product_type'].unique().tolist())     # tutte le classi del dataset
         self.mapping = {i: j for j, i in enumerate(self.all_classes)}       # mapping classe_i -> j (intero)
+        print(self.mapping)
         # ciclicamente solo una porzione del dataset completo viene utilizzata (sarà usata come validation set)
         self.image_ids = self._get_ids_in_split()
 
@@ -480,31 +481,31 @@ def main(args):
         for i in tqdm(range(N_FOLDS), total=N_FOLDS, desc='Creo gli split del dataset.'):
             splits.append(MyDataset(ROOT, N_FOLDS, i, mode=MODE, transforms=val_transforms, seed=SEED))
 
-        for i, split in tqdm(enumerate(splits), total=N_FOLDS, desc='COMPLETED FOLDS'):
-            # ciclicamente uso uno split come val, reimposto le transforms a val_transforms nel caso fossero state
-            # cambiate in precedenza
-            val_ds = split  # split è il dataset che sto usando come validation
-            class_mapping = val_ds.mapping
-            val_ds.set_transforms(val_transforms)
-            val_loader = DataLoader(val_ds, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS)
-
-            # gli altri split li uso per il train, mettendoli in una lista e passandoli a Concat, settando prima le
-            # train_transform
-            train_datasets = [j for j in splits if j is not split]  # come train uso gli altri, unendoli con Concat
-            for d in train_datasets:
-                d.set_transforms(train_transforms)
-            train_ds = Concat(train_datasets)
-            train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
-
-            cls = Classifier(BACKBONE, DEVICE, actual_dir, class_mapping)      # inizializzo il classificatore
-            train_result = cls.train(train_loader, val_loader, i, EPOCHS, LR)      # alleno
-            best_results.append(train_result)
-
-        accuracies = [r["accuracy"] for r in best_results]  # elenco le best_accuracy di ogni fold per farne la media
-        mean_accuracy = np.mean(accuracies)
-        for i, r in enumerate(best_results):
-            print(f'Fold {i+1}: miglior accuratezza raggiunta dopo {r["epoch"]} epoche pari al {r["accuracy"]}%.')
-        print(f'Accuracy media: {mean_accuracy}')
+        # for i, split in tqdm(enumerate(splits), total=N_FOLDS, desc='COMPLETED FOLDS'):
+        #     # ciclicamente uso uno split come val, reimposto le transforms a val_transforms nel caso fossero state
+        #     # cambiate in precedenza
+        #     val_ds = split  # split è il dataset che sto usando come validation
+        #     class_mapping = val_ds.mapping
+        #     val_ds.set_transforms(val_transforms)
+        #     val_loader = DataLoader(val_ds, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS)
+        #
+        #     # gli altri split li uso per il train, mettendoli in una lista e passandoli a Concat, settando prima le
+        #     # train_transform
+        #     train_datasets = [j for j in splits if j is not split]  # come train uso gli altri, unendoli con Concat
+        #     for d in train_datasets:
+        #         d.set_transforms(train_transforms)
+        #     train_ds = Concat(train_datasets)
+        #     train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
+        #
+        #     cls = Classifier(BACKBONE, DEVICE, actual_dir, class_mapping)      # inizializzo il classificatore
+        #     train_result = cls.train(train_loader, val_loader, i, EPOCHS, LR)      # alleno
+        #     best_results.append(train_result)
+        #
+        # accuracies = [r["accuracy"] for r in best_results]  # elenco le best_accuracy di ogni fold per farne la media
+        # mean_accuracy = np.mean(accuracies)
+        # for i, r in enumerate(best_results):
+        #     print(f'Fold {i+1}: miglior accuratezza raggiunta dopo {r["epoch"]} epoche pari al {r["accuracy"]}%.')
+        # print(f'Accuracy media: {mean_accuracy}')
 
     else:
         # a questo giro deve essere il percorso completo alla cartella in cui sono stati salvati i progressi
