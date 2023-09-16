@@ -18,6 +18,7 @@ from torchvision.models.resnet import resnet50
 from torchinfo import summary
 
 from easyfsl.datasets import FewShotDataset
+from easyfsl.methods import FewShotClassifier
 
 
 class MyDataset(FewShotDataset):
@@ -153,3 +154,61 @@ class Concat(Dataset):
                 # return interrompe il ciclo for, quindi non c'è bisogno di controllare di essere tra i due
                 # estremi del dataset, basta ritornare il primo in cui si 'entra', traslando gli indici se i>0
                 return self.datasets[i][index]
+
+
+def train_one_epoch(model: FewShotClassifier, dataloader: DataLoader, epoch: int, optimizer: torch.optim.Optimizer,
+                    criterion, writer: SummaryWriter, device):
+    """
+    Allena la rete per un'epoca.
+
+    :param model:       il modello(già sul giusto device).
+    :param dataloader:  il dataloader del dataset di train.
+    :param epoch:       l'epoca attuale (serve solo per salvare le metriche nel summary writer).
+    :param optimizer:   per aggiornare i parametri.
+    :param criterion:   per la loss.
+    :param writer:      per salvare le metriche.
+    :return:
+    """
+    model.train()      # modalità train
+    optimizer.zero_grad()   # svuoto i gradienti
+
+    n_episodes = len(dataloader)
+    progress = tqdm(dataloader, total=n_episodes, leave=False, desc='COMPLETED EPISODES')
+    epoch_loss = 0.0    # inizializzo la loss
+    epoch_correct = 0   # segno le prediction corrette della rete per poi calcolare l'accuracy
+    tot_cases = 0       # counter dei casi totali (sarebbe la len(dataset_train))
+    for sample in progress:
+        support_images, support_labels, query_images, query_labels = sample
+        support_images, support_labels = support_images.to(device), support_labels.to(device)
+        query_images, query_labels = query_images.to(device), query_labels.to(device)
+
+        batch_cases = query_images.shape[0]  # numero di sample nel batch
+        tot_cases += batch_cases  # accumulo il numero totale di sample
+
+        # output della rete
+        model.process_support_set(support_images, support_labels)   # usa il support set per fine tuning
+        classification_scores = model(query_images)
+        logits = model(images)  # output della rete prima di applicare softmax
+        outputs = F.softmax(logits, dim=1)  # class probabilities
+        # il risultato di softmax viene interpretato con politica winner takes all
+        batch_decisions = torch.argmax(outputs, dim=1)
+
+        # loss del batch e backward step
+        batch_loss = criterion(classification_scores, query_labels)
+        batch_loss.backward()
+        optimizer.step()
+        optimizer.zero_grad()
+
+        # accumulo le metriche di interesse
+        epoch_loss += batch_loss.item()    # avendo usato reduction='sum' nella loss qui sto sommando la loss totale
+        batch_correct = torch.sum(batch_decisions == labels)    # risposte corrette per il batch attuale
+        epoch_correct += batch_correct.item()      # totale risposte corrette sull'epoca
+
+        postfix = {'batch_mean_loss': batch_loss.item()/batch_cases,
+                   'batch_accuracy': (batch_correct.item()/batch_cases) * 100.0}
+        progress.set_postfix(postfix)
+
+    epoch_mean_loss = epoch_loss / tot_cases        # loss media sull'epoca
+    epoch_accuracy = (epoch_correct / tot_cases) * 100.0        # accuracy sull'epoca (%)
+    writer.add_scalar(f'Loss/Train', epoch_mean_loss, epoch + 1)
+    writer.add_scalar(f'Accuracy/Train', epoch_accuracy, epoch + 1)

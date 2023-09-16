@@ -314,7 +314,7 @@ class Classifier:
             # layer finale, a questo giro tanti neuroni quanto il numero di singoli prodotti
             self.model.fc = nn.Linear(2048, self.num_classes)
             # stampa a schermo la rete
-            summary(self.model, input_size=(1, 3, 224, 224))
+            # summary(self.model, input_size=(1, 3, 224, 224))
 
         else:
             self.num_super_classes = len(mapping)  # numero delle superclassi
@@ -371,7 +371,7 @@ class Classifier:
         optimizer.zero_grad()   # svuoto i gradienti
 
         n_batches = len(dataloader)
-        progress = tqdm(dataloader, total=n_batches, leave=False, desc='EPOCH')
+        progress = tqdm(dataloader, total=n_batches, leave=False, desc='COMPLETED BATCHES')
         epoch_loss = 0.0    # inizializzo la loss
         epoch_correct = 0   # segno le prediction corrette della rete per poi calcolare l'accuracy
         tot_cases = 0       # counter dei casi totali (sarebbe la len(dataset_train))
@@ -504,7 +504,7 @@ class Classifier:
         optimizer.zero_grad()   # svuoto i gradienti
 
         n_batches = len(dataloader)
-        progress = tqdm(dataloader, total=n_batches, leave=False, desc='EPOCH')
+        progress = tqdm(dataloader, total=n_batches, leave=False, desc='COMPLETED BATCHES')
         epoch_class_loss = 0.0    # inizializzo la loss delle superclassi
         epoch_class_correct = 0   # prediction corrette della rete per calcolare l'accuracy sulle superclassi
         epoch_item_loss = 0.0  # inizializzo la loss dei prodotti
@@ -684,7 +684,7 @@ class Classifier:
         self.model.eval()  # passa in modalità eval
 
         n_batches = len(dataloader)
-        progress = tqdm(dataloader, total=n_batches, leave=False, desc='EVAL')
+        progress = tqdm(dataloader, total=n_batches, leave=False, desc='TEST')
         class_correct = 0  # prediction corrette della rete per calcolare l'accuracy sulle superclassi
         item_correct = 0  # segno le prediction corrette della rete per poi calcolare l'accuracy sui prodotti
         tot_cases = 0  # counter dei casi totali (sarebbe la len(dataset_train))
@@ -744,7 +744,7 @@ class Classifier:
         # batch e dividerle a fine epoca per ottenere la loss
         criterion = nn.CrossEntropyLoss(reduction='sum')
         ckpt_dir = self.ckpt_dir / f'fold_{split}'
-        progress = tqdm(range(epochs), total=epochs, leave=False, desc='FOLD')
+        progress = tqdm(range(epochs), total=epochs, leave=False, desc='COMPLETED EPOCHS')
         # creo un summary writer per salvare le metriche (loss e accuracy)
         writer = SummaryWriter(log_dir=str(ckpt_dir))
 
@@ -851,7 +851,7 @@ def main(args):
         for i in tqdm(range(N_FOLDS), total=N_FOLDS, desc='Creo gli split del dataset.'):
             splits.append(MyDataset(ROOT, N_FOLDS, i, mode=MODE, transforms=val_transforms, method=METHOD, seed=SEED))
 
-        for i, split in tqdm(enumerate(splits), total=N_FOLDS, desc=f'{N_FOLDS}-fold cross validation...'):
+        for i, split in tqdm(enumerate(splits), total=N_FOLDS, desc='COMPLETED FOLDS'):
             # ciclicamente uso uno split come val, reimposto le transforms a val_transforms nel caso fossero state
             # cambiate in precedenza
             val_ds = split  # split è il dataset che sto usando come validation
