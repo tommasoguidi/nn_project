@@ -272,6 +272,49 @@ class Classifier:
 
         return accuracy, top3_acc
 
+    @torch.no_grad()
+    def test_moe(self, dataloader):
+        """
+        Valuta l'accuratezza della rete sul dataset di test.
+
+        :param dataloader:  il dataloader del dataset di test.
+        :return:
+        """
+        self.model.eval()  # passa in modalità eval
+
+        n_batches = len(dataloader)
+        progress = tqdm(dataloader, total=n_batches, leave=False, desc='TEST')
+        class_correct = 0  # prediction corrette della rete per calcolare l'accuracy sulle superclassi
+        tot_cases = 0  # counter dei casi totali (sarebbe la len(dataset_train))
+        for sample in progress:
+            class_decisions = []
+
+            images, super_class_labels = sample
+            batch_cases = images.shape[0]  # numero di sample nel batch
+            tot_cases += batch_cases  # accumulo il numero totale di esempi
+            # adesso il problema è che per ogni esempio l'architettura della rete cambia, quindi per aggiornare i
+            # gradienti non mi viene in mente altro che ciclare sui vari esempi, facendo lo step alla fine del ciclo
+            # in modo da preservare la batch_mode
+            for image, _ in zip(images, super_class_labels):
+                image = torch.unsqueeze(image.to(self.device), dim=0)
+                # output della rete, a questo giro come superclass prendo la prediction fatta dalla backbone
+                super_class_logit, super_class_output = self.forward(image)
+                # il risultato di softmax viene interpretato con politica winner takes all
+                super_class_decision = torch.argmax(super_class_output)  # adesso l'argomento è un vettore, non un batch
+                class_decisions.append(super_class_decision)
+
+            # trasformo in tensori le liste in cui ho accumulato le varie loss
+            class_decisions = torch.tensor(class_decisions, device=self.device)
+
+            # accumulo le metriche di interesse
+            class_bool = class_decisions == super_class_labels.to(self.device)
+            batch_class_correct = torch.sum(class_bool)
+            class_correct += batch_class_correct.item()
+
+        class_accuracy = (class_correct / tot_cases) * 100.0  # accuracy sull'epoca (%)
+
+        return class_accuracy
+
 
 def main(args):
     ROOT = Path(args.root)
@@ -296,10 +339,10 @@ def main(args):
     for i in ['resnet', 'myresnet']:
         cls = Classifier(i, class_mapping)  # inizializzo il classificatore
 
-        test_accuracy, top3_accuracy = cls.test(test_loader)
+        test_accuracy = cls.test_moe(test_loader)
         print(f'Risultati ottenuti da {i}:')
         print(f'Accuracy sui dati di test: {test_accuracy}%')
-        print(f'Top3-Accuracy sui dati di test: {top3_accuracy}%')
+        # print(f'Top3-Accuracy sui dati di test: {top3_accuracy}%')
 
 
 if __name__ == '__main__':
