@@ -587,6 +587,8 @@ class Classifier:
                        'batch_item_accuracy': (batch_item_correct.item() / batch_cases) * 100.0}
             progress.set_postfix(postfix)
 
+            break
+
         epoch_mean_class_loss = epoch_class_loss / tot_cases        # loss media sull'epoca
         epoch_mean_item_loss = epoch_item_loss / tot_cases  # loss media sull'epoca
         epoch_class_accuracy = (epoch_class_correct / tot_cases) * 100.0        # accuracy sull'epoca (%)
