@@ -251,15 +251,15 @@ class Classifier:
             # carico il modello pretrainato di resnet50 su imagenet
             self.model = resnet50(weights='DEFAULT', progress=True)
             # congelo i parametri tranne quelli degli ultimi 3 blocchi
-            blocks = list(self.model.children())
-            for b in blocks[:-3]:
-                for p in b.parameters():
-                    p.requires_grad = False
+            # blocks = list(self.model.children())
+            # for b in blocks[:-3]:
+            #     for p in b.parameters():
+            #         p.requires_grad = False
             # layer finale
             self.model.fc = nn.Linear(2048, 10)
 
-            model_state = torch.load('runs/classifier/run_7/fold_0/classifier.pth', map_location=self.device)
-            self.model.load_state_dict(model_state["model"])
+            # model_state = torch.load('runs/classifier/run_7/fold_0/classifier.pth', map_location=self.device)
+            # self.model.load_state_dict(model_state["model"])
 
         self.model.to(self.device)
 
