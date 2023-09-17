@@ -211,18 +211,18 @@ class MoE(nn.Module):
         # e come classes il numero dei prodotti appartenenti alla i-esima super class
         self.heads = nn.ModuleList([Head(2048, 100) for i in range(10)])
 
-    def forward(self, x):
+    def forward(self, x, super_class=torch.tensor([5])):
         # il metodo forward() di resnet è stato modificato per ritornare anche il feature vector
         # il forward di moe avviene su un singolo evento e non su un batch
         super_class_logits, feature_vector = self.resnet.forward(x)
         super_class_output = F.softmax(super_class_logits, dim=1)  # class probability
-        # super_class_decision = torch.argmax(super_class_output)
-        # # la indirizzo alla testa scelta da decision
-        # if super_class is not None:
-        #     item_logits = self.heads[super_class.item()].forward(feature_vector)
-        # else:
-        #     item_logits = self.heads[super_class_decision.item()].forward(feature_vector)     # caso eval
-        # item_output = F.softmax(item_logits, dim=1)  # class probability
+        super_class_decision = torch.argmax(super_class_output)
+        # la indirizzo alla testa scelta da decision
+        if super_class is not None:
+            item_logits = self.heads[super_class.item()].forward(feature_vector)
+        else:
+            item_logits = self.heads[super_class_decision.item()].forward(feature_vector)     # caso eval
+        item_output = F.softmax(item_logits, dim=1)  # class probability
 
         return super_class_logits, super_class_output
 
