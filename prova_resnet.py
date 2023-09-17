@@ -179,6 +179,54 @@ class MyResNet(nn.Module):
         return x, feature_vector
 
 
+class Head(nn.Module):
+    """Questa è la classe base delle classification heads usate nel caso 'moe'."""
+    def __init__(self, in_features: int, classes: int):
+        super().__init__()
+        self.layer1 = nn.Linear(in_features, 4096)
+        self.layer2 = nn.Linear(4096, 2048)
+        self.layer3 = nn.Linear(2048, classes)
+
+    def forward(self, x):
+        x = F.relu(self.layer1(x))
+        x = F.relu(self.layer2(x))
+        x = F.dropout(x)
+        logits = self.layer3(x)  # output della rete prima di applicare softmax
+        return logits
+
+
+class MoE(nn.Module):
+    """
+    Il modulo è composto dalla resnet preallenata su imagenet e una lista di classification heads, una per ciascuna
+    classe.
+    """
+    def __init__(self):
+        """
+        """
+        super().__init__()
+        # metto la mia resnet con forward modificato
+        self.resnet = MyResNet()
+        # creo un'istanza della classe Head() per ogni super classe e la aggiungo alla ModuleList
+        # la i-esima istanza ha come in_features la dimensione delle feature uscenti dalla resnet dopo flatten() (2048)
+        # e come classes il numero dei prodotti appartenenti alla i-esima super class
+        self.heads = nn.ModuleList([Head(2048, 100) for i in range(10)])
+
+    def forward(self, x, super_class):
+        # il metodo forward() di resnet è stato modificato per ritornare anche il feature vector
+        # il forward di moe avviene su un singolo evento e non su un batch
+        super_class_logits, feature_vector = self.resnet.forward(x)
+        super_class_output = F.softmax(super_class_logits, dim=1)  # class probability
+        super_class_decision = torch.argmax(super_class_output)
+        # la indirizzo alla testa scelta da decision
+        if super_class is not None:
+            item_logits = self.heads[super_class.item()].forward(feature_vector)
+        else:
+            item_logits = self.heads[super_class_decision.item()].forward(feature_vector)     # caso eval
+        item_output = F.softmax(item_logits, dim=1)  # class probability
+
+        return super_class_logits, super_class_output
+
+
 class Classifier:
     """Classificatore per le 50 classi in esame"""
 
@@ -197,7 +245,7 @@ class Classifier:
         self.backbone = backbone
 
         if self.backbone == 'myresnet':
-            self.model = MyResNet()
+            self.model = MoE()
 
         elif self.backbone == 'resnet':
             # carico il modello pretrainato di resnet50 su imagenet
@@ -228,8 +276,7 @@ class Classifier:
             logits = self.model(x)      # output della rete prima di applicare softmax
             outputs = F.softmax(logits, dim=1)      # class probabilities
         else:
-            logits, _ = self.model(x)
-            outputs = F.softmax(logits, dim=1)  # class probability
+            logits, outputs = self.model(x)
 
         return logits, outputs
 
