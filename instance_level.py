@@ -541,18 +541,20 @@ class Classifier:
                 batch_class_loss += super_class_loss
                 item_loss = criterion(item_logit, item_label)   # loss sui prodotti
                 batch_item_loss += item_loss
-                # loss totale, aggiungo enfasi alla class loss perchè determina in cascata la possibilità
-                # di classificare corretttamente il prodotto
-                print('-'*50)
-                print(f'super_class_logit = {super_class_logit}')
-                print(f'super_class_output = {super_class_output}')
-                print(f'super_class_decision = {super_class_decision}')
-                print(f'super_class_label = {super_class_label}')
-                print(f'super_class_logit = {super_class_logit.size()}')
-                print(f'super_class_label = {super_class_label.size()}')
-                print(f'item_label = {item_label}')
-                print(f'item_logit = {item_logit.size()}')
-                print(f'item_label = {item_label.size()}')
+
+                # print('-'*50)
+                # print(f'super_class_logit = {super_class_logit}')
+                # print(f'super_class_output = {super_class_output}')
+                # print(f'super_class_decision = {super_class_decision}')
+                # print(f'super_class_label = {super_class_label}')
+                # print(f'super_class_logit = {super_class_logit.size()}')
+                # print(f'super_class_label = {super_class_label.size()}')
+                # print(f'item_label = {item_label}')
+                # print(f'item_logit = {item_logit.size()}')
+                # print(f'item_label = {item_label.size()}')
+
+            # loss totale, aggiungo enfasi alla class loss perchè determina in cascata la possibilità
+            # di classificare corretttamente il prodotto
             total_loss = 2.0 * batch_class_loss + batch_item_loss
             total_loss.backward()
 
@@ -576,23 +578,21 @@ class Classifier:
             batch_item_correct = torch.sum(torch.logical_and(class_bool, item_bool))
             epoch_item_correct += batch_item_correct.item()
 
-            print(f'Class decisions: {batch_class_decisions}')
-            print(f'Class labels: {super_class_labels}')
-            print(f'Item decisions: {batch_item_decisions}')
-            print(f'Item labels: {item_labels}')
-            print(f'Class correct: {batch_class_correct}')
-            print(f'Item correct: {batch_item_correct}')
-            print(f'Class accuracy: {(batch_class_correct.item() / batch_cases) * 100.0}')
-            print(f'Item accuracy: {(batch_item_correct.item() / batch_cases) * 100.0}')
-            print('-' * 50)
+            # print(f'Class decisions: {batch_class_decisions}')
+            # print(f'Class labels: {super_class_labels}')
+            # print(f'Item decisions: {batch_item_decisions}')
+            # print(f'Item labels: {item_labels}')
+            # print(f'Class correct: {batch_class_correct}')
+            # print(f'Item correct: {batch_item_correct}')
+            # print(f'Class accuracy: {(batch_class_correct.item() / batch_cases) * 100.0}')
+            # print(f'Item accuracy: {(batch_item_correct.item() / batch_cases) * 100.0}')
+            # print('-' * 50)
 
             postfix = {'batch_mean_class_loss': (batch_class_loss / batch_cases).item(),
                        'batch_class_accuracy': (batch_class_correct.item() / batch_cases) * 100.0,
                        'batch_mean_item_loss': (batch_item_loss / batch_cases).item(),
                        'batch_item_accuracy': (batch_item_correct.item() / batch_cases) * 100.0}
             progress.set_postfix(postfix)
-
-            break
 
         epoch_mean_class_loss = epoch_class_loss / tot_cases        # loss media sull'epoca
         epoch_mean_item_loss = epoch_item_loss / tot_cases  # loss media sull'epoca
