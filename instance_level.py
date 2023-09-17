@@ -523,7 +523,9 @@ class Classifier:
             # gradienti non mi viene in mente altro che ciclare sui vari esempi, facendo lo step alla fine del ciclo
             # in modo da preservare la batch_mode
             for image, super_class_label, item_label in zip(images, super_class_labels, item_labels):
+                print(image.shape)
                 image = torch.unsqueeze(image.to(self.device), dim=0)
+                print(image.shape)
                 super_class_label = torch.unsqueeze(super_class_label.to(self.device), dim=0)
                 item_label = torch.unsqueeze(item_label.to(self.device), dim=0)
                 # output della rete
