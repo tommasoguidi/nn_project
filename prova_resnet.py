@@ -176,7 +176,7 @@ class MyResNet(nn.Module):
         feature_vector = torch.flatten(x, 1)
         x = self.resnet.fc(feature_vector)
 
-        return x
+        return x, feature_vector
 
 
 class Classifier:
@@ -194,11 +194,12 @@ class Classifier:
         self.device = 'cuda'
         self.model = None
         self.outputs = len(mapping)   # quante sono le classi nel nostro caso
+        self.backbone = backbone
 
-        if backbone == 'myresnet':
+        if self.backbone == 'myresnet':
             self.model = MyResNet()
 
-        elif backbone == 'resnet':
+        elif self.backbone == 'resnet':
             # carico il modello pretrainato di resnet50 su imagenet
             self.model = resnet50(weights='DEFAULT', progress=True)
             # congelo i parametri tranne quelli degli ultimi 3 blocchi
@@ -223,8 +224,12 @@ class Classifier:
         :return outputs:    output della rete (class probabilities).
         """
 
-        logits = self.model(x)      # output della rete prima di applicare softmax
-        outputs = F.softmax(logits, dim=1)      # class probabilities
+        if self.backbone == 'resnet':
+            logits = self.model(x)      # output della rete prima di applicare softmax
+            outputs = F.softmax(logits, dim=1)      # class probabilities
+        else:
+            logits, _ = self.model.forward(x)
+            outputs = F.softmax(logits, dim=1)  # class probability
 
         return logits, outputs
 
