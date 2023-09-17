@@ -228,7 +228,7 @@ class Classifier:
             logits = self.model(x)      # output della rete prima di applicare softmax
             outputs = F.softmax(logits, dim=1)      # class probabilities
         else:
-            logits, _ = self.model.forward(x)
+            logits, _ = self.model(x)
             outputs = F.softmax(logits, dim=1)  # class probability
 
         return logits, outputs
