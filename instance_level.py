@@ -267,12 +267,11 @@ class MoE(nn.Module):
         super_class_logits, feature_vector = self.resnet.forward(x)
         super_class_output = F.softmax(super_class_logits, dim=1)  # class probability
         super_class_decision = torch.argmax(super_class_output)
-        feature_encoding = feature_vector
         # la indirizzo alla testa scelta da decision
         if super_class is not None:
-            item_logits = self.heads[super_class.item()].forward(feature_encoding)
+            item_logits = self.heads[super_class.item()].forward(feature_vector)
         else:
-            item_logits = self.heads[super_class_decision.item()].forward(feature_encoding)     # caso eval
+            item_logits = self.heads[super_class_decision.item()].forward(feature_vector)     # caso eval
         item_output = F.softmax(item_logits, dim=1)  # class probability
 
         return super_class_logits, super_class_output, item_logits, item_output
