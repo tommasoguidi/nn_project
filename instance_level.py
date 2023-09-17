@@ -575,7 +575,9 @@ class Classifier:
             epoch_item_correct += batch_item_correct.item()
 
             print(f'Class decisions: {batch_class_decisions}')
+            print(f'Class labels: {super_class_labels}')
             print(f'Item decisions: {batch_item_decisions}')
+            print(f'Item labels: {item_labels}')
             print(f'Class correct: {batch_class_correct}')
             print(f'Item correct: {batch_item_correct}')
             print(f'Class accuracy: {(batch_class_correct.item() / batch_cases) * 100.0}')
