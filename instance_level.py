@@ -547,6 +547,8 @@ class Classifier:
             total_loss.backward()
 
             print(f'super_class_logit = {super_class_logit}')
+            print(f'super_class_output = {super_class_output}')
+            print(f'super_class_decision = {super_class_decision}')
             print(f'super_class_label = {super_class_label}')
             print(f'super_class_logit = {super_class_logit.size()}')
             print(f'super_class_label = {super_class_label.size()}')
