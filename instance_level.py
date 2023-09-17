@@ -523,9 +523,7 @@ class Classifier:
             # gradienti non mi viene in mente altro che ciclare sui vari esempi, facendo lo step alla fine del ciclo
             # in modo da preservare la batch_mode
             for image, super_class_label, item_label in zip(images, super_class_labels, item_labels):
-                print(image.shape)
                 image = torch.unsqueeze(image.to(self.device), dim=0)
-                print(image.shape)
                 super_class_label = torch.unsqueeze(super_class_label.to(self.device), dim=0)
                 item_label = torch.unsqueeze(item_label.to(self.device), dim=0)
                 # output della rete
@@ -545,18 +543,18 @@ class Classifier:
                 batch_item_loss += item_loss
                 # loss totale, aggiungo enfasi alla class loss perchè determina in cascata la possibilità
                 # di classificare corretttamente il prodotto
+                print('-'*50)
+                print(f'super_class_logit = {super_class_logit}')
+                print(f'super_class_output = {super_class_output}')
+                print(f'super_class_decision = {super_class_decision}')
+                print(f'super_class_label = {super_class_label}')
+                print(f'super_class_logit = {super_class_logit.size()}')
+                print(f'super_class_label = {super_class_label.size()}')
+                print(f'item_label = {item_label}')
+                print(f'item_logit = {item_logit.size()}')
+                print(f'item_label = {item_label.size()}')
             total_loss = 2.0 * batch_class_loss + batch_item_loss
             total_loss.backward()
-
-            print(f'super_class_logit = {super_class_logit}')
-            print(f'super_class_output = {super_class_output}')
-            print(f'super_class_decision = {super_class_decision}')
-            print(f'super_class_label = {super_class_label}')
-            print(f'super_class_logit = {super_class_logit.size()}')
-            print(f'super_class_label = {super_class_label.size()}')
-            print(f'item_label = {item_label}')
-            print(f'item_logit = {item_logit.size()}')
-            print(f'item_label = {item_label.size()}')
 
             # aggiorno i pesi
             optimizer.step()
@@ -586,6 +584,7 @@ class Classifier:
             print(f'Item correct: {batch_item_correct}')
             print(f'Class accuracy: {(batch_class_correct.item() / batch_cases) * 100.0}')
             print(f'Item accuracy: {(batch_item_correct.item() / batch_cases) * 100.0}')
+            print('-' * 50)
 
             postfix = {'batch_mean_class_loss': (batch_class_loss / batch_cases).item(),
                        'batch_class_accuracy': (batch_class_correct.item() / batch_cases) * 100.0,
