@@ -265,7 +265,7 @@ class MoE(nn.Module):
         # il metodo forward() di resnet è stato modificato per ritornare anche il feature vector
         # il forward di moe avviene su un singolo evento e non su un batch
         super_class_logits, feature_vector = self.resnet.forward(x)
-        super_class_output = F.softmax(super_class_logits, dim=0)  # class probability
+        super_class_output = F.softmax(super_class_logits, dim=1)  # class probability
         super_class_decision = torch.argmax(super_class_output)
         feature_encoding = feature_vector
         # la indirizzo alla testa scelta da decision
@@ -273,7 +273,7 @@ class MoE(nn.Module):
             item_logits = self.heads[super_class.item()].forward(feature_encoding)
         else:
             item_logits = self.heads[super_class_decision.item()].forward(feature_encoding)     # caso eval
-        item_output = F.softmax(item_logits, dim=0)  # class probability
+        item_output = F.softmax(item_logits, dim=1)  # class probability
 
         return super_class_logits, super_class_output, item_logits, item_output
 
@@ -532,9 +532,9 @@ class Classifier:
                 super_class_logit, super_class_output, item_logit, item_output = self.forward(image, super_class_label)
 
                 # il risultato di softmax viene interpretato con politica winner takes all
-                super_class_decision = torch.argmax(super_class_output)   # adesso l'argomento è un vettore, non un batch
+                super_class_decision = torch.argmax(super_class_output, dim=1)
                 batch_class_decisions.append(super_class_decision)
-                item_decision = torch.argmax(item_output)
+                item_decision = torch.argmax(item_output, dim=1)
                 batch_item_decisions.append(item_decision)
 
                 # loss del batch e backward step
