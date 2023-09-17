@@ -543,16 +543,16 @@ class Classifier:
                 batch_item_loss += item_loss
                 # loss totale, aggiungo enfasi alla class loss perchè determina in cascata la possibilità
                 # di classificare corretttamente il prodotto
-                total_loss = 2.0 * super_class_loss + item_loss
-                total_loss.backward()
-                # except:
-                #     print(f'super_class_logit = {super_class_logit}')
-                #     print(f'super_class_label = {super_class_label}')
-                #     print(f'super_class_logit = {super_class_logit.size()}')
-                #     print(f'super_class_label = {super_class_label.size()}')
-                #     print(f'item_label = {item_label}')
-                #     print(f'item_logit = {item_logit.size()}')
-                #     print(f'item_label = {item_label.size()}')
+            total_loss = 2.0 * batch_class_loss + batch_item_loss
+            total_loss.backward()
+
+            print(f'super_class_logit = {super_class_logit}')
+            print(f'super_class_label = {super_class_label}')
+            print(f'super_class_logit = {super_class_logit.size()}')
+            print(f'super_class_label = {super_class_label.size()}')
+            print(f'item_label = {item_label}')
+            print(f'item_logit = {item_logit.size()}')
+            print(f'item_label = {item_label.size()}')
 
             # aggiorno i pesi
             optimizer.step()
@@ -573,6 +573,13 @@ class Classifier:
             item_bool = batch_item_decisions == item_labels.to(self.device)
             batch_item_correct = torch.sum(torch.logical_and(class_bool, item_bool))
             epoch_item_correct += batch_item_correct.item()
+
+            print(f'Class decisions: {batch_class_decisions}')
+            print(f'Item decisions: {batch_item_decisions}')
+            print(f'Class correct: {batch_class_correct}')
+            print(f'Item correct: {batch_item_correct}')
+            print(f'Class accuracy: {(batch_class_correct.item() / batch_cases) * 100.0}')
+            print(f'Item accuracy: {(batch_item_correct.item() / batch_cases) * 100.0}')
 
             postfix = {'batch_mean_class_loss': (batch_class_loss / batch_cases).item(),
                        'batch_class_accuracy': (batch_class_correct.item() / batch_cases) * 100.0,
