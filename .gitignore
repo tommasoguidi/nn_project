@@ -2,4 +2,4 @@ runs/
 .idea/
 prove.py
 classifier.pth
-
+prova_resnet.py
