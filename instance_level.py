@@ -12,7 +12,7 @@ from torch.utils.data import Dataset, DataLoader
 from torch.utils.tensorboard import SummaryWriter
 import torch.nn as nn
 import torch.nn.functional as F
-from torchvision.transforms import Compose, RandomHorizontalFlip, RandomAffine, ToTensor
+from torchvision.transforms import Compose, RandomHorizontalFlip, RandomAffine, ToTensor, Normalize
 from torchvision.models.resnet import resnet50
 from torchinfo import summary
 
@@ -765,8 +765,6 @@ class Classifier:
         if self.method == 'naive':
             best_acc = 0.0
             for epoch in progress:
-                # train
-
                 # alleno la rete su tutti gli esempi del train set (1 epoca)
                 self.train_naive_one_epoch(train_loader, epoch, optimizer, criterion, writer)
                 # valido il modello attuale sul validation set e ottengo l'accuratezza attuale
@@ -843,11 +841,14 @@ def main(args):
                                        ' specifici ciascuno per ogni categoria merceologica.'
 
     train_transforms = Compose([ToTensor(),
-                                RandomAffine(45, translate=(0.1, 0.1),
-                                             scale=(0.8, 1.2), fill=255),
-                                RandomHorizontalFlip(p=0.5)])
-    val_transforms = Compose([ToTensor()])
+                                RandomAffine(45, translate=(0.1, 0.1), scale=(0.8, 1.2), fill=255),
+                                RandomHorizontalFlip(p=0.5),
+                                Normalize(mean=torch.tensor([0.485, 0.456, 0.406]),
+                                          std=torch.tensor([0.229, 0.224, 0.225]))])
 
+    val_transforms = Compose([ToTensor(),
+                              Normalize(mean=torch.tensor([0.485, 0.456, 0.406]),
+                                        std=torch.tensor([0.229, 0.224, 0.225]))])
     # train mode
     if MODE == 'train':
         # creo una cartella dove salverò l'andamento dei vari allenamenti, serve solo se sto trainando
@@ -889,17 +890,17 @@ def main(args):
                 print(f'Fold {i + 1}: miglior accuratezza raggiunta dopo {r["epoch"]} epoche pari al {r["accuracy"]}%.')
             accuracies = [r["accuracy"] for r in best_results]  # elenco le best_accuracy di ogni fold per la media
             mean_accuracy = np.mean(accuracies)
-            print(f'Accuracy media: {mean_accuracy}')
+            print(f'Accuracy media: {mean_accuracy}%.')
         else:
             for i, r in enumerate(best_results):
                 print(f'Fold {i + 1}: miglior accuratezza raggiunta dopo {r["epoch"]} epoche. Class accuracy pari al '
                       f'{r["class_accuracy"]}%, item accuracy pari al {r["item_accuracy"]}%.')
             class_accuracies = [r["class_accuracy"] for r in best_results]
             mean_class_accuracy = np.mean(class_accuracies)
-            print(f'Class accuracy media: {mean_class_accuracy}')
+            print(f'Class accuracy media: {mean_class_accuracy}%.')
             item_accuracies = [r["item_accuracy"] for r in best_results]
             mean_item_accuracy = np.mean(item_accuracies)
-            print(f'Item accuracy media: {mean_item_accuracy}')
+            print(f'Item accuracy media: {mean_item_accuracy}%.')
 
     else:
         # a questo giro deve essere il percorso completo alla cartella in cui sono stati salvati i progressi
@@ -915,17 +916,17 @@ def main(args):
 
         if METHOD == 'naive':
             test_accuracy = cls.test_naive(test_loader)
-            print(f'Accuracy sui dati di test: {test_accuracy}')
+            print(f'Accuracy sui dati di test: {test_accuracy}%.')
         else:
             class_accuracy, item_accuracy = cls.test_moe(test_loader)
-            print(f'Class accuracy sui dati di test: {class_accuracy}')
-            print(f'Item accuracy sui dati di test: {item_accuracy}')
+            print(f'Class accuracy sui dati di test: {class_accuracy}%.')
+            print(f'Item accuracy sui dati di test: {item_accuracy}%.')
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Train del classificatore',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--root', type=str, default=r'C:\Users\rx571gt-b034t\Desktop\PROJECT\subset_10',
+    parser.add_argument('--root', type=str, default='/home/deepmammo/tommaso/prove/subset_10/',
                         help='Root del dataset.')
     parser.add_argument('--n-folds', type=int, default=3, help='Numero di fold per la cross validation')
     parser.add_argument('-m', '--mode', type=str, default='train',
@@ -938,9 +939,7 @@ if __name__ == '__main__':
     parser.add_argument('--lr', type=float, default=0.001, help='Learning rate.')
     parser.add_argument('--seed', type=int, default=123, help='Per riproducibilità.')
     parser.add_argument('--checkpoint_dir', type=str, default='runs/instance_level',
-                        help='Cartella dove salvare i risultati dei vari esperimenti. Se --mode == "train" specificare'
-                             ' la cartella madre che contiene tutte le annotazioni sugli esperimenti; se --mode =='
-                             ' "eval" indicare la cartella dello specifico esperimento che si vuole valutare.')
+                        help='Cartella dove salvare i risultati dei vari esperimenti.')
     parser.add_argument('--method', type=str, default='moe',
                         help='Scegliere se usare un approccio "naive" (#neuroni_out == #classi) o "moe"'
                              ' (mixture of experts). Il metodo naive carica il classificatore ottenuto al passo'

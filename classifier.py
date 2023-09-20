@@ -504,7 +504,7 @@ def main(args):
         mean_accuracy = np.mean(accuracies)
         for i, r in enumerate(best_results):
             print(f'Fold {i+1}: miglior accuratezza raggiunta dopo {r["epoch"]} epoche pari al {r["accuracy"]}%.')
-        print(f'Accuracy media: {mean_accuracy}')
+        print(f'Accuracy media: {mean_accuracy}%.')
 
     else:
         # a questo giro deve essere il percorso completo alla cartella in cui sono stati salvati i progressi
@@ -519,14 +519,14 @@ def main(args):
         cls.load(WEIGHTS)
 
         test_accuracy, top3_accuracy = cls.test(test_loader)
-        print(f'Accuracy sui dati di test: {test_accuracy}')
-        print(f'Top3-Accuracy sui dati di test: {top3_accuracy}')
+        print(f'Accuracy sui dati di test: {test_accuracy}%.')
+        print(f'Top3-Accuracy sui dati di test: {top3_accuracy}%.')
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Train del classificatore',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--root', type=str, default=r'C:\Users\rx571gt-b034t\Desktop\PROJECT\subset_10',
+    parser.add_argument('--root', type=str, default='/home/deepmammo/tommaso/prove/subset_10/',
                         help='Root del dataset.')
     parser.add_argument('--n-folds', type=int, default=3, help='Numero di fold per la cross validation')
     parser.add_argument('-m', '--mode', type=str, default='train',
