@@ -430,9 +430,9 @@ if __name__ == '__main__':
     parser.add_argument('--val-episodes', type=int, default=100, help='Numero di episodi per ogni step di validazione.')
     parser.add_argument('--test-episodes', type=int, default=1000, help='Numero di episodi per il test.')
     parser.add_argument('--n-way', type=int, default=5, help='Numero di classi per ogni episodio.')
-    parser.add_argument('--k-shot', type=int, default=5, help='Numero di esempi per ogni classe nel support set.')
-    parser.add_argument('--n-query', type=int, default=10, help='Numero di esempi per ogni classe nel query set.')
-    parser.add_argument('--num-workers', type=int, default=3, help='Numero di worker.')
+    parser.add_argument('--k-shot', type=int, default=1, help='Numero di esempi per ogni classe nel support set.')
+    parser.add_argument('--n-query', type=int, default=4, help='Numero di esempi per ogni classe nel query set.')
+    parser.add_argument('--num-workers', type=int, default=16, help='Numero di worker.')
     parser.add_argument('--lr', type=float, default=0.001, help='Learning rate.')
     parser.add_argument('--seed', type=int, default=123, help='Per riproducibilità.')
     parser.add_argument('--checkpoint_dir', type=str, default='runs/fsl',
