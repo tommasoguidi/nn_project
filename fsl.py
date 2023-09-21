@@ -98,6 +98,7 @@ class MyDataset(FewShotDataset):
         # a senso non dovrebbe cambiare niente rispetto al caso semplice, ovviamente a questo giro all_classes sono
         # gli item_id invece dei product_type
         classes_per_split = len(self.classes) // (self.n_folds + 1)
+        print(len(self.classes), classes_per_split)
         start = self.split * classes_per_split
         if self.mode == 'train':
             end = start + classes_per_split
