@@ -241,7 +241,7 @@ def train(epochs: int, model: FewShotClassifier, train_loader: DataLoader, val_l
 
 
 def main(args):
-    ROOT = args.root
+    ROOT = Path(args.root)
     N_FOLDS = args.n_folds
     MODE = args.mode
     DEVICE = args.device
@@ -256,9 +256,9 @@ def main(args):
     NUM_WORKERS = args.num_workers
     LR = args.lr
     SEED = args.seed
-    CHECKPOINT_DIR = args.checkpoint_dir
+    CHECKPOINT_DIR = Path(args.checkpoint_dir)
     METHOD = args.method
-    WEIGHTS = args.weights
+    WEIGHTS = Path(args.weights)
 
     assert MODE in ['train', 'eval'], '--mode deve essere uno tra "train" e "eval".'
     assert DEVICE in ['cuda', 'cpu'], '--device deve essere uno tra "cuda" e "cpu".'
@@ -375,6 +375,9 @@ def main(args):
             elif BACKBONE == 'resnet18':
                 f_dim = 512
             classifier = MatchingNetworks(backbone=resnet50(), feature_dimension=f_dim).to(DEVICE)
+
+        model_state = torch.load(WEIGHTS, map_location=DEVICE)
+        classifier.load_state_dict(model_state["model"])
 
         accuracy = evaluate(classifier, test_loader, device=DEVICE)
         print(f'Accuracy sui dati di test: {accuracy}%.')
