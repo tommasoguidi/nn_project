@@ -436,6 +436,7 @@ def main(args):
     NUM_WORKERS = args.num_workers
     LR = args.lr
     CHECKPOINT_DIR = Path(args.checkpoint_dir)
+    FULL_PATH = args.full_path
     WEIGHTS = Path(args.weights)
     SEED = args.seed
 
@@ -464,17 +465,20 @@ def main(args):
                                     RandomHorizontalFlip(p=0.5)])
         val_transforms = Compose([ToTensor()])
 
-    # train mode
-    if MODE == 'train':
+    if not FULL_PATH:
         # creo una cartella dove salverò l'andamento dei vari allenamenti, serve solo se sto trainando
         os.makedirs(CHECKPOINT_DIR, exist_ok=True)  # creo la directory se già non esiste
         past_experiments = len(os.listdir(CHECKPOINT_DIR))  # la prima si chiamerà run_0, la seconda run_1 e così via
-        actual_dir = CHECKPOINT_DIR / f'run_{past_experiments}'     # qui salvo i risultati degli esperimenti
+        actual_dir = CHECKPOINT_DIR / f'run_{past_experiments}'  # qui salvo i risultati degli esperimenti
         for i in range(N_FOLDS):
             # makedirs crea tutte le cartelle intermedie che ancora non esistono specificate nel path
             # exists_ok fa si che se una cartella esiste già non c'è un errore
-            os.makedirs(actual_dir / f'fold_{i}', exist_ok=True)      # qui salvo i risultati del singolo split
+            os.makedirs(actual_dir / f'fold_{i}', exist_ok=True)  # qui salvo i risultati del singolo split
+    else:
+        actual_dir = CHECKPOINT_DIR
 
+    # train mode
+    if MODE == 'train':
         splits = []     # qui salvo gli n_folds dataset che sono i singoli split
         best_results = []
         for i in tqdm(range(N_FOLDS), total=N_FOLDS, desc='Creo gli split del dataset.'):
@@ -541,8 +545,10 @@ if __name__ == '__main__':
     parser.add_argument('--num-workers', type=int, default=3, help='Numero di worker.')
     parser.add_argument('--lr', type=float, default=0.001, help='Learning rate.')
     parser.add_argument('--seed', type=int, default=123, help='Per riproducibilità.')
-    parser.add_argument('--checkpoint_dir', type=str, default='runs/classifier',
+    parser.add_argument('--checkpoint-dir', type=str, default='runs/classifier',
                         help='Cartella dove salvare i risultati dei vari esperimenti.')
+    parser.add_argument('--full-path', type=bool, default='false',
+                        help='Se lancio nohup passo direttamente il path runs/x/run_y con le subdir già fatte.')
     parser.add_argument('--weights', type=str, default='classifier.pth',
                         help='Percorso dei pesi da usare per il classificatore.')
 
