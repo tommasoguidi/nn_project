@@ -32,7 +32,7 @@ def run_nohup(args):
             flag = '--' + flag
             command = ' '.join([command, flag, str(arg)])
 
-    command += f' > {total_path} &'
+    command += f' --checkpoint-dir {str(dest)} > {total_path} &'
 
     print(command)
     os.system(command)
@@ -59,8 +59,6 @@ if __name__ == '__main__':
     parser.add_argument('--num-workers', type=int, default=3, help='Numero di worker. (C, I, F)')
     parser.add_argument('--lr', type=float, default=0.001, help='Learning rate. (C, I, F)')
     parser.add_argument('--seed', type=int, default=123, help='Per riproducibilità. (C, I, F)')
-    parser.add_argument('--checkpoint-dir', type=str, default='runs/classifier',
-                        help='Cartella dove salvare i risultati dei vari esperimenti. (C, I, F)')
     parser.add_argument('--full-path', type=bool, default=False,
                         help='Se lancio nohup passo direttamente il path runs/x/run_y con '
                              'le subdir già fatte. (C, I, F)')
