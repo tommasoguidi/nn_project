@@ -23,7 +23,6 @@ def run_nohup(args):
         os.makedirs(dest / f'fold_{i}', exist_ok=True)  # qui salvo i risultati del singolo split
     total_path = dest / 'run_events.out'
 
-    assert args.modality in ['train', 'evaluate'], ''
     command = f'nohup python {args.script}.py'
     for flag in vars(args):
 
