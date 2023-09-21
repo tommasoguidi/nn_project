@@ -20,7 +20,6 @@ from easyfsl.methods import FewShotClassifier
 from easyfsl.samplers import TaskSampler
 from easyfsl.methods import PrototypicalNetworks, MatchingNetworks, RelationNetworks
 from easyfsl.modules import resnet18, resnet50
-from easyfsl.utils import evaluate
 
 
 class MyDataset(FewShotDataset):
@@ -218,7 +217,7 @@ def validate(model: FewShotClassifier, val_loader: DataLoader, device: torch.dev
         # output della rete
         model.process_support_set(support_images, support_labels)
         episode_predictions = model(query_images).detach().data
-        correct_predictions = torch.sum(torch.argmax(episode_predictions, dim=1) == query_labels).item()
+        correct_predictions = torch.sum(torch.argmax(episode_predictions, dim=1) == query_labels)
 
         epoch_correct += correct_predictions.item()
         postfix = {'batch_accuracy': (correct_predictions.item() / episode_cases) * 100.0}
@@ -409,7 +408,7 @@ def main(args):
         model_state = torch.load(WEIGHTS, map_location=DEVICE)
         classifier.load_state_dict(model_state["model"])
 
-        accuracy = evaluate(classifier, test_loader, device=DEVICE)
+        accuracy = validate(classifier, test_loader, DEVICE)
         print(f'Accuracy sui dati di test: {accuracy}%.')
 
 
