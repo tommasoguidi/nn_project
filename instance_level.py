@@ -918,7 +918,7 @@ def main(args):
         test_loader = DataLoader(test_ds, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS)
 
         cls = Classifier(METHOD, DEVICE, actual_dir, class_mapping, WEIGHTS, pretrained=True)  # inizializzo il classificatore
-        cls.load(WEIGHTS)
+        # cls.load(WEIGHTS)
 
         if METHOD == 'naive':
             test_accuracy = cls.test_naive(test_loader)
@@ -958,7 +958,8 @@ if __name__ == '__main__':
                         help='Scegliere se usare un approccio "naive" o "moe" se siamo in "instance_level", '
                              '"proto", "match" o "rel" se siamo in fsl. (I, F)')
     parser.add_argument('--pretrained', type=bool, default=False,
-                        help='Per decidere se allenare anche la resnet o semplicemente caricare i pesi. (I)')
+                        help='Ha senso solo durante il train se vogliamo allenare solo le teste ed utilizzare un '
+                             'modello già allenato per fare la classificazione iniziale. (I)')
     parser.add_argument('--episodes', type=int, default=500, help='Numero di episodi per ogni epoca. (F)')
     parser.add_argument('--val-episodes', type=int, default=100,
                         help='Numero di episodi per ogni step di validazione. (F)')
