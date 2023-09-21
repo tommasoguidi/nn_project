@@ -98,14 +98,14 @@ class MyDataset(FewShotDataset):
         # a senso non dovrebbe cambiare niente rispetto al caso semplice, ovviamente a questo giro all_classes sono
         # gli item_id invece dei product_type
         classes_per_split = len(self.classes) // (self.n_folds + 1)
-        print(len(self.classes), classes_per_split)
         start = self.split * classes_per_split
         if self.mode == 'train':
             end = start + classes_per_split
         elif self.mode == 'eval':
             end = None
         random.seed(self.seed)
-        self.classes_in_split = random.shuffle(self.classes)[start: end]
+        random.shuffle(self.classes)
+        self.classes_in_split = self.classes[start: end]
         ids_in_split = self.annos.index[self.annos['item_id'].isin(self.classes_in_split)].tolist()
 
         return ids_in_split
