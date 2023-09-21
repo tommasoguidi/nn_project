@@ -335,9 +335,9 @@ def main(args):
             val_sampler = TaskSampler(val_ds, n_way=N_WAY, n_shot=K_SHOT, n_query=N_QUERY, n_tasks=VAL_EPISODES)
 
             # collate_fn custom che restituisce (support_images, support_labels, query_images, query_labels, class_ids)
-            train_loader = DataLoader(train_ds, batch_sampler=train_sampler, num_workers=NUM_WORKERS, pin_memory=True,
+            train_loader = DataLoader(train_ds, batch_sampler=train_sampler, num_workers=NUM_WORKERS, pin_memory=False,
                                       collate_fn=train_sampler.episodic_collate_fn)
-            val_loader = DataLoader(val_ds, batch_sampler=val_sampler, num_workers=NUM_WORKERS, pin_memory=True,
+            val_loader = DataLoader(val_ds, batch_sampler=val_sampler, num_workers=NUM_WORKERS, pin_memory=False,
                                     collate_fn=val_sampler.episodic_collate_fn)
 
             # cls = Classifier(METHOD, DEVICE, actual_dir, class_mapping, WEIGHTS, PRETRAINED)
@@ -387,7 +387,7 @@ def main(args):
         # TEST
         test_ds = MyDataset(ROOT, N_FOLDS, split=0, mode=MODE, transforms=transforms, seed=SEED)
         test_sampler = TaskSampler(test_ds, n_way=N_WAY, n_shot=K_SHOT, n_query=N_QUERY, n_tasks=TEST_EPISODES)
-        test_loader = DataLoader(test_ds, batch_sampler=test_sampler, num_workers=NUM_WORKERS, pin_memory=True,
+        test_loader = DataLoader(test_ds, batch_sampler=test_sampler, num_workers=NUM_WORKERS, pin_memory=False,
                                  collate_fn=test_sampler.episodic_collate_fn)
         backbones = {'resnet': resnet50(), 'resnet18': resnet18()}
         bb = backbones[BACKBONE]
