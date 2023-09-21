@@ -180,7 +180,7 @@ def train_one_epoch(model: FewShotClassifier, dataloader: DataLoader, optimizer:
     progress = tqdm(dataloader, total=n_episodes, leave=False, desc='COMPLETED EPISODES')
     epoch_loss = 0.0    # inizializzo la loss
     for sample in progress:
-        support_images, support_labels, query_images, query_labels = sample
+        support_images, support_labels, query_images, query_labels, _ = sample
         support_images, support_labels = support_images.to(device), support_labels.to(device)
         query_images, query_labels = query_images.to(device), query_labels.to(device)
         # output della rete
