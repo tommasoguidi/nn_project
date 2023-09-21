@@ -641,9 +641,9 @@ class Classifier:
                 # output della rete
                 super_class_logit, super_class_output, item_logit, item_output = self.forward(image, super_class_label)
                 # il risultato di softmax viene interpretato con politica winner takes all
-                super_class_decision = torch.argmax(super_class_output)  # adesso l'argomento è un vettore, non un batch
+                super_class_decision = torch.argmax(super_class_output, dim=1)  # adesso l'argomento è un vettore, non un batch
                 batch_class_decisions.append(super_class_decision)
-                item_decision = torch.argmax(item_output)
+                item_decision = torch.argmax(item_output, dim=1)
                 batch_item_decisions.append(item_decision)
 
                 # loss del batch e backward step
@@ -716,9 +716,9 @@ class Classifier:
                 # output della rete, a questo giro come superclass prendo la prediction fatta dalla backbone
                 super_class_logit, super_class_output, item_logit, item_output = self.forward(image, None)
                 # il risultato di softmax viene interpretato con politica winner takes all
-                super_class_decision = torch.argmax(super_class_output)  # adesso l'argomento è un vettore, non un batch
+                super_class_decision = torch.argmax(super_class_output, dim=1)  # adesso l'argomento è un vettore, non un batch
                 class_decisions.append(super_class_decision)
-                item_decision = torch.argmax(item_output)
+                item_decision = torch.argmax(item_output, dim=1)
                 item_decisions.append(item_decision)
 
             # trasformo in tensori le liste in cui ho accumulato le varie loss

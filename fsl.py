@@ -361,10 +361,11 @@ def main(args):
             elif METHOD == 'match':
                 # qui cambiano le dimensioni del vettore delle feature e dato che la matching network restituisce delle
                 # log-probabilities, quindi andremo a usare la Negative Log Likelihood Loss
-                if BACKBONE == 'resnet':
-                    f_dim = 2048
-                elif BACKBONE == 'resnet18':
-                    f_dim = 512
+                # if BACKBONE == 'resnet':
+                #     f_dim = 2048
+                # elif BACKBONE == 'resnet18':
+                #     f_dim = 512
+                f_dim = 2048
                 classifier = MatchingNetworks(backbone=resnet50(), feature_dimension=f_dim).to(DEVICE)
                 criterion = nn.NLLLoss(reduction='sum')
 
