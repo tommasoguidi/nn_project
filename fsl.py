@@ -367,7 +367,7 @@ def main(args):
             # adesso ho il classificatore e la loss function, mi manca da definire l'optimizer e il summary per il log
             # dei dati del train
             optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, classifier.parameters()), LR)
-            ckpt_dir = actual_dir / f'fold_{split}'
+            ckpt_dir = actual_dir / f'fold_{i}'
 
             best_metrics = train(EPOCHS, classifier, train_loader, val_loader, optimizer, criterion, DEVICE, ckpt_dir)
             best_results.append(best_metrics)
