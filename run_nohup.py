@@ -4,13 +4,15 @@ from pathlib import Path
 
 
 def run_nohup(args):
-    comb = {'fsl': ['proto', 'match', 'rel'],
-            'instance_level': ['moe', 'naive'],
-            'classifier': []}
+    comb = {'fsl': {'method': ['proto', 'match', 'rel'], 'backbone': ['resnet', 'resnet18']},
+            'instance_level': {'method': ['moe', 'naive'], 'backbone': []},
+            'classifier': {'method': [], 'backbone': ['resnet', 'resnet18', 'cnn']}}
 
     assert args.script in comb, f'Gli script runnabili sono {[i for i in comb]}.'
-    assert args.method in comb[args.script] if args.script != 'classifier' else True, \
-        f'I method consentiti per {args.script} sono {comb[args.script]}.'
+    assert args.method in comb[args.script]['method'] if args.script != 'classifier' else True, \
+        f'I method consentiti per {args.script} sono {comb[args.script]["method"]}.'
+    assert args.backbone in comb[args.script]['backbone'] if args.script != 'instance_level' else True, \
+        f'I method consentiti per {args.script} sono {comb[args.script]["backbone"]}.'
     dest = Path('runs') / args.script
     os.makedirs(dest, exist_ok=True)  # creo la directory se già non esiste
     past_experiments = len(os.listdir(dest))  # la prima si chiamerà run_0, la seconda run_1 e così via
