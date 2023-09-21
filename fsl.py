@@ -200,6 +200,35 @@ def train_one_epoch(model: FewShotClassifier, dataloader: DataLoader, optimizer:
     return epoch_mean_loss
 
 
+@torch.no_grad()
+def validate(model: FewShotClassifier, val_loader: DataLoader, device: torch.device):
+    model.eval()  # passa in modalità eval
+
+    n_episodes = len(val_loader)
+    progress = tqdm(val_loader, total=n_episodes, leave=False, desc='EVAL')
+    epoch_correct = 0  # segno le prediction corrette della rete per poi calcolare l'accuracy
+    tot_cases = 0  # counter dei casi totali (sarebbe la len(dataset_val))
+    for sample in progress:
+        support_images, support_labels, query_images, query_labels, _ = sample
+        support_images, support_labels = support_images.to(device), support_labels.to(device)
+        query_images, query_labels = query_images.to(device), query_labels.to(device)
+
+        episode_cases = query_labels.shape[0]  # numero di sample nel batch
+        tot_cases += episode_cases  # accumulo il numero totale di sample
+        # output della rete
+        model.process_support_set(support_images, support_labels)
+        episode_predictions = model(query_images).detach().data
+        correct_predictions = torch.sum(torch.argmax(episode_predictions, dim=1) == query_labels).item()
+
+        epoch_correct += correct_predictions.item()
+        postfix = {'batch_accuracy': (correct_predictions.item() / episode_cases) * 100.0}
+        progress.set_postfix(postfix)
+
+    epoch_accuracy = (epoch_correct / tot_cases) * 100.0
+
+    return epoch_accuracy
+
+
 def train(epochs: int, model: FewShotClassifier, train_loader: DataLoader, val_loader: DataLoader,
           optimizer: torch.optim.Optimizer, criterion: nn.Module, device: torch.device, ckpt_dir: Path):
     """
@@ -222,7 +251,7 @@ def train(epochs: int, model: FewShotClassifier, train_loader: DataLoader, val_l
         epoch_mean_loss = train_one_epoch(model, train_loader, optimizer, criterion, device)
         writer.add_scalar(f'Loss/Train', epoch_mean_loss, epoch + 1)
         # valido il modello attuale sul validation set e ottengo l'accuratezza attuale
-        acc_now = evaluate(model, val_loader, device=device, tqdm_prefix="Validation")
+        acc_now = validate(model, val_loader, device)
         writer.add_scalar(f'Accuracy/Val', acc_now, epoch + 1)
         # scelgo il modello migliore e lo salvo
         if acc_now > best_acc:
