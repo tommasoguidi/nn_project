@@ -199,9 +199,9 @@ class MyResNet(nn.Module):
         super().__init__()
         self.device = device
         if pretrained:
-            self.resnet = resnet50()
-            # modifico il final layer per poter caricare i miei pesi
-            self.resnet.fc = nn.Linear(2048, num_super_classes)
+            self.resnet = resnet50(num_classes=num_super_classes)
+            # # modifico il final layer per poter caricare i miei pesi
+            # self.resnet.fc = nn.Linear(2048, num_super_classes)
             model_state = torch.load(weights, map_location=self.device)
             self.resnet.load_state_dict(model_state["model"])
             # congelo i parametri per allenare solo il layer finale
@@ -851,21 +851,21 @@ def main(args):
                               Normalize(mean=torch.tensor([0.485, 0.456, 0.406]),
                                         std=torch.tensor([0.229, 0.224, 0.225]))])
 
-    if not NOHUP:
-        # creo una cartella dove salverò l'andamento dei vari allenamenti, serve solo se sto trainando
-        CHECKPOINT_DIR = Path('runs/instance_level')
-        os.makedirs(CHECKPOINT_DIR, exist_ok=True)  # creo la directory se già non esiste
-        past_experiments = len(os.listdir(CHECKPOINT_DIR))  # la prima si chiamerà run_0, la seconda run_1 e così via
-        actual_dir = CHECKPOINT_DIR / f'run_{past_experiments}'  # qui salvo i risultati degli esperimenti
-        for i in range(N_FOLDS):
-            # makedirs crea tutte le cartelle intermedie che ancora non esistono specificate nel path
-            # exists_ok fa si che se una cartella esiste già non c'è un errore
-            os.makedirs(actual_dir / f'fold_{i}', exist_ok=True)  # qui salvo i risultati del singolo split
-    else:
-        actual_dir = CHECKPOINT_DIR
-
     # train mode
     if MODE == 'train':
+        if not NOHUP:
+            # creo una cartella dove salverò l'andamento dei vari allenamenti, serve solo se sto trainando
+            CHECKPOINT_DIR = Path('runs/instance_level')
+            os.makedirs(CHECKPOINT_DIR, exist_ok=True)  # creo la directory se già non esiste
+            past_experiments = len(
+                os.listdir(CHECKPOINT_DIR))  # la prima si chiamerà run_0, la seconda run_1 e così via
+            actual_dir = CHECKPOINT_DIR / f'run_{past_experiments}'  # qui salvo i risultati degli esperimenti
+            for i in range(N_FOLDS):
+                # makedirs crea tutte le cartelle intermedie che ancora non esistono specificate nel path
+                # exists_ok fa si che se una cartella esiste già non c'è un errore
+                os.makedirs(actual_dir / f'fold_{i}', exist_ok=True)  # qui salvo i risultati del singolo split
+        else:
+            actual_dir = CHECKPOINT_DIR
         # creo una cartella dove salverò l'andamento dei vari allenamenti, serve solo se sto trainando
         splits = []     # qui salvo gli n_folds dataset che sono i singoli split
         best_results = []
