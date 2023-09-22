@@ -923,7 +923,7 @@ def main(args):
             test_accuracy = cls.test_naive(test_loader)
             print(f'Accuracy sui dati di test: {test_accuracy}%.')
         else:
-            class_accuracy, item_accuracy = cls.test_moe(test_loader)
+            class_accuracy, item_accuracy = cls.validate_moe(test_loader)
             print(f'Class accuracy sui dati di test: {class_accuracy}%.')
             print(f'Item accuracy sui dati di test: {item_accuracy}%.')
 
