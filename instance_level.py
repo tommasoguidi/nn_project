@@ -292,6 +292,7 @@ class Classifier:
         self.device = device
         self.ckpt_dir = ckpt_dir
         self.model = None
+        self.pretrained = pretrained
         if self.method == 'naive':
             self.num_classes = len(mapping)
             # carico il modello di resnet50 senza pretrain
@@ -318,7 +319,7 @@ class Classifier:
             # lista con il numero di sottoclassi per ogni superclasse (-1 perchè va scartato l'identifier della superclasse)
             self.len_item_classes = [len(mapping[key]) - 1 for key in mapping]
             # carico il modello pretrainato di resnet50 su imagenet
-            self.model = MoE(self.num_super_classes, self.len_item_classes, pretrained, weights, self.device)
+            self.model = MoE(self.num_super_classes, self.len_item_classes, self.pretrained, weights, self.device)
             # stampa a schermo la rete
             # summary(self.model, input_size=(1, 3, 224, 224), super_class=1)
 
@@ -498,6 +499,8 @@ class Classifier:
         :return:
         """
         self.model.train()      # modalità train
+        if self.pretrained:
+            self.model.resnet.eval()
         optimizer.zero_grad()   # svuoto i gradienti
 
         n_batches = len(dataloader)
