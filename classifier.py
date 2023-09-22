@@ -436,7 +436,7 @@ def main(args):
     NUM_WORKERS = args.num_workers
     LR = args.lr
     CHECKPOINT_DIR = Path(args.checkpoint_dir)
-    FULL_PATH = args.full_path
+    NOHUP = args.nohup
     WEIGHTS = Path(args.weights)
     SEED = args.seed
 
@@ -465,8 +465,9 @@ def main(args):
                                     RandomHorizontalFlip(p=0.5)])
         val_transforms = Compose([ToTensor()])
 
-    if not FULL_PATH:
+    if not NOHUP:
         # creo una cartella dove salverò l'andamento dei vari allenamenti, serve solo se sto trainando
+        CHECKPOINT_DIR = Path('runs/classifier')
         os.makedirs(CHECKPOINT_DIR, exist_ok=True)  # creo la directory se già non esiste
         past_experiments = len(os.listdir(CHECKPOINT_DIR))  # la prima si chiamerà run_0, la seconda run_1 e così via
         actual_dir = CHECKPOINT_DIR / f'run_{past_experiments}'  # qui salvo i risultati degli esperimenti
@@ -547,9 +548,7 @@ if __name__ == '__main__':
     parser.add_argument('--seed', type=int, default=123, help='Per riproducibilità. (C, I, F)')
     parser.add_argument('--checkpoint-dir', type=str, default='runs/classifier',
                         help='Cartella dove salvare i risultati dei vari esperimenti. (C, I, F)')
-    parser.add_argument('--full-path', type=bool, default=False,
-                        help='Se lancio nohup passo direttamente il path runs/x/run_y con '
-                             'le subdir già fatte. (C, I, F)')
+    parser.add_argument('--nohup', type=bool, default=False, help='Se lancio da nohup passo true. (C, I, F)')
     parser.add_argument('--weights', type=str, default='classifier.pth',
                         help='Percorso dei pesi da usare per il classificatore. (C, I, F)')
     parser.add_argument('--method', type=str, default='moe',
