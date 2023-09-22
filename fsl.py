@@ -215,8 +215,8 @@ def validate(model: FewShotClassifier, val_loader: DataLoader, device: torch.dev
     for sample in progress:
         support_images, support_labels, query_images, query_labels, _ = sample
         support_images, support_labels = support_images.to(device), support_labels.to(device)
-        if method == 'rel':
-            query_labels = F.one_hot(query_labels, num_classes=n_way).type(torch.float)
+        # if method == 'rel':
+        #     query_labels = F.one_hot(query_labels, num_classes=n_way).type(torch.float)
         query_images, query_labels = query_images.to(device), query_labels.to(device)
 
         episode_cases = query_labels.shape[0]  # numero di sample nel batch
