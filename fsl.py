@@ -356,7 +356,7 @@ def main(args):
                 # il pooling e impostare come feature_dimension la prima dimensione della feature map che è 28
                 # in entrambi i casi, nel paper usano la Mean Square Error e noi li seguiamo
                 bb.use_pooling = False
-                f_dim = 28
+                f_dim = 512
                 classifier = RelationNetworks(backbone=bb, feature_dimension=f_dim).to(DEVICE)
                 criterion = nn.MSELoss(reduction='sum')
             elif METHOD == 'match':

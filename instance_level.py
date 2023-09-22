@@ -200,8 +200,6 @@ class MyResNet(nn.Module):
         self.device = device
         if pretrained:
             self.resnet = resnet50(num_classes=num_super_classes)
-            # # modifico il final layer per poter caricare i miei pesi
-            # self.resnet.fc = nn.Linear(2048, num_super_classes)
             model_state = torch.load(weights, map_location=self.device)
             self.resnet.load_state_dict(model_state["model"])
             # congelo i parametri per allenare solo il layer finale
