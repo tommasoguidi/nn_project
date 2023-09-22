@@ -436,9 +436,6 @@ if __name__ == '__main__':
     parser.add_argument('--num-workers', type=int, default=3, help='Numero di worker. (C, I, F)')
     parser.add_argument('--lr', type=float, default=0.001, help='Learning rate. (C, I, F)')
     parser.add_argument('--seed', type=int, default=123, help='Per riproducibilità. (C, I, F)')
-    parser.add_argument('--checkpoint-dir', type=str, default='runs/classifier',
-                        help='Cartella dove salvare i risultati dei vari esperimenti. (C, I, F)')
-    parser.add_argument('--nohup', type=bool, default=False, help='Se lancio da nohup passo true. (C, I, F)')
     parser.add_argument('--weights', type=str, default='classifier.pth',
                         help='Percorso dei pesi da usare per il classificatore. (C, I, F)')
     parser.add_argument('--method', type=str, default='moe',
@@ -453,6 +450,10 @@ if __name__ == '__main__':
     parser.add_argument('--n-way', type=int, default=5, help='Numero di classi per ogni episodio. (F)')
     parser.add_argument('--k-shot', type=int, default=1, help='Numero di esempi per ogni classe nel support set. (F)')
     parser.add_argument('--n-query', type=int, default=4, help='Numero di esempi per ogni classe nel query set. (F)')
+    # -----------QUESTI-VENGONO-PASSATI-SOLO-DA-NOHUP-E-NON-VANNO-USATI-------------------------------------------------
+    parser.add_argument('--checkpoint-dir', type=str, default='runs/classifier',
+                        help='Cartella dove salvare i risultati dei vari esperimenti. (C, I, F)')
+    parser.add_argument('--nohup', type=bool, default=False, help='Se lancio da nohup passo true. (C, I, F)')
 
     arguments = parser.parse_args()
     main(arguments)
