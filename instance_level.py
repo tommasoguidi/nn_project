@@ -916,8 +916,8 @@ def main(args):
         class_mapping = test_ds.mapping
         test_loader = DataLoader(test_ds, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS)
 
-        cls = Classifier(METHOD, DEVICE, actual_dir, class_mapping, WEIGHTS, pretrained=False)  # inizializzo il classificatore
-        cls.load(WEIGHTS)
+        cls = Classifier(METHOD, DEVICE, actual_dir, class_mapping, WEIGHTS, pretrained=True)  # inizializzo il classificatore
+        # cls.load(WEIGHTS)
 
         if METHOD == 'naive':
             test_accuracy = cls.test_naive(test_loader)
