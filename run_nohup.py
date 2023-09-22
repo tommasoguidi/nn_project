@@ -26,7 +26,7 @@ def run_nohup(args):
     command = f'nohup python {args.script}.py'
     for flag in vars(args):
         arg = getattr(args, flag)
-        if flag != 'script' and arg != 'False':
+        if flag != 'script' and arg:
             flag = flag.replace('_', '-')
             flag = '--' + flag
             command = ' '.join([command, flag, str(arg)])
