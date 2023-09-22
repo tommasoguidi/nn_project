@@ -916,16 +916,14 @@ def main(args):
         class_mapping = test_ds.mapping
         test_loader = DataLoader(test_ds, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS)
 
-        cls = Classifier(METHOD, DEVICE, actual_dir, class_mapping, WEIGHTS, pretrained=True)  # inizializzo il classificatore
-        # cls.load(WEIGHTS)
+        cls = Classifier(METHOD, DEVICE, actual_dir, class_mapping, WEIGHTS, pretrained=False)  # inizializzo il classificatore
+        cls.load(WEIGHTS)
 
         if METHOD == 'naive':
             test_accuracy = cls.test_naive(test_loader)
             print(f'Accuracy sui dati di test: {test_accuracy}%.')
         else:
-            class_accuracy, item_accuracy = cls.validate_moe(test_loader, epoch=1,
-                                                             criterion=nn.CrossEntropyLoss(reduction='sum'),
-                                                             writer=SummaryWriter(log_dir=str('.')))
+            class_accuracy, item_accuracy = cls.test_moe(test_loader)
             print(f'Class accuracy sui dati di test: {class_accuracy}%.')
             print(f'Item accuracy sui dati di test: {item_accuracy}%.')
 
