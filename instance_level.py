@@ -753,8 +753,8 @@ class Classifier:
         :return:
         """
         # così si fa sì che l'optimizer aggiorni solo i parametri non congelati
-        # optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.model.parameters()), lr)
-        optimizer = torch.optim.SGD(filter(lambda p: p.requires_grad, self.model.parameters()), lr)
+        optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.model.parameters()), lr)
+        # optimizer = torch.optim.SGD(filter(lambda p: p.requires_grad, self.model.parameters()), lr)
         # impostiamo la crossentropy loss con reduction='sum' in modo da poter sommare direttamente le loss di ogni
         # batch e dividerle a fine epoca per ottenere la loss
         criterion = nn.CrossEntropyLoss(reduction='sum')
