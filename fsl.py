@@ -12,6 +12,7 @@ import torch
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 import torch.nn as nn
+import torch.nn.functional as F
 from torchvision.transforms import Compose, RandomHorizontalFlip, RandomAffine, ToTensor, Normalize
 from torchinfo import summary
 
@@ -161,7 +162,7 @@ class Concat(FewShotDataset):
 
 
 def train_one_epoch(model: FewShotClassifier, dataloader: DataLoader, optimizer: torch.optim.Optimizer,
-                    criterion: nn.Module, device: torch.device):
+                    criterion: nn.Module, device: torch.device, method: str, n_way: int):
     """
     Allena la rete per un'epoca.
 
@@ -170,6 +171,8 @@ def train_one_epoch(model: FewShotClassifier, dataloader: DataLoader, optimizer:
     :param optimizer:   per aggiornare i parametri.
     :param criterion:   per la loss.
     :param device:      cuda o cpu.
+    :param method:      metodo usato.
+    :param n_way:       numero di classi.
     :return:
     """
     model.train()      # modalità train
@@ -181,6 +184,8 @@ def train_one_epoch(model: FewShotClassifier, dataloader: DataLoader, optimizer:
     for sample in progress:
         support_images, support_labels, query_images, query_labels, _ = sample
         support_images, support_labels = support_images.to(device), support_labels.to(device)
+        if method == 'rel':
+            query_labels = F.one_hot(query_labels, num_classes=n_way).type(torch.float)
         query_images, query_labels = query_images.to(device), query_labels.to(device)
         # output della rete
         model.process_support_set(support_images, support_labels)   # usa il support set per fine tuning
@@ -200,7 +205,7 @@ def train_one_epoch(model: FewShotClassifier, dataloader: DataLoader, optimizer:
 
 
 @torch.no_grad()
-def validate(model: FewShotClassifier, val_loader: DataLoader, device: torch.device):
+def validate(model: FewShotClassifier, val_loader: DataLoader, device: torch.device, method: str, n_way: int):
     model.eval()  # passa in modalità eval
 
     n_episodes = len(val_loader)
@@ -210,6 +215,8 @@ def validate(model: FewShotClassifier, val_loader: DataLoader, device: torch.dev
     for sample in progress:
         support_images, support_labels, query_images, query_labels, _ = sample
         support_images, support_labels = support_images.to(device), support_labels.to(device)
+        if method == 'rel':
+            query_labels = F.one_hot(query_labels, num_classes=n_way).type(torch.float)
         query_images, query_labels = query_images.to(device), query_labels.to(device)
 
         episode_cases = query_labels.shape[0]  # numero di sample nel batch
@@ -229,7 +236,8 @@ def validate(model: FewShotClassifier, val_loader: DataLoader, device: torch.dev
 
 
 def train(epochs: int, model: FewShotClassifier, train_loader: DataLoader, val_loader: DataLoader,
-          optimizer: torch.optim.Optimizer, criterion: nn.Module, device: torch.device, ckpt_dir: Path):
+          optimizer: torch.optim.Optimizer, criterion: nn.Module, device: torch.device, ckpt_dir: Path,
+          method: str, n_way: int):
     """
 
     :param epochs:          numero di epoche.
@@ -239,7 +247,9 @@ def train(epochs: int, model: FewShotClassifier, train_loader: DataLoader, val_l
     :param optimizer:       per aggiornare i parametri (serve solo a train__one_epoch).
     :param criterion:       par calcolare la loss (serve solo a train__one_epoch).
     :param device:          cuda o cpu.
-    :param ckpt_dir:        la directory dove stiamo salvando il modello
+    :param ckpt_dir:        la directory dove stiamo salvando il modello.
+    :param method:          metodo usato.
+    :param n_way:           numero di classi.
     :return:
     """
     writer = SummaryWriter(log_dir=str(ckpt_dir))
@@ -247,10 +257,10 @@ def train(epochs: int, model: FewShotClassifier, train_loader: DataLoader, val_l
     progress = tqdm(range(epochs), total=epochs, leave=False, desc='COMPLETED EPOCHS')
     for epoch in progress:
         # alleno la rete su tutti gli esempi del train set (1 epoca)
-        epoch_mean_loss = train_one_epoch(model, train_loader, optimizer, criterion, device)
+        epoch_mean_loss = train_one_epoch(model, train_loader, optimizer, criterion, device, method, n_way)
         writer.add_scalar(f'Loss/Train', epoch_mean_loss, epoch + 1)
         # valido il modello attuale sul validation set e ottengo l'accuratezza attuale
-        acc_now = validate(model, val_loader, device)
+        acc_now = validate(model, val_loader, device, method, n_way)
         writer.add_scalar(f'Accuracy/Val', acc_now, epoch + 1)
         # scelgo il modello migliore e lo salvo
         if acc_now > best_acc:
@@ -375,7 +385,8 @@ def main(args):
             optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, classifier.parameters()), LR)
             ckpt_dir = actual_dir / f'fold_{i}'
 
-            best_metrics = train(EPOCHS, classifier, train_loader, val_loader, optimizer, criterion, DEVICE, ckpt_dir)
+            best_metrics = train(EPOCHS, classifier, train_loader, val_loader, optimizer, criterion, DEVICE, ckpt_dir,
+                                 METHOD, N_WAY)
             best_results.append(best_metrics)
 
         for i, r in enumerate(best_results):
@@ -414,7 +425,7 @@ def main(args):
         model_state = torch.load(WEIGHTS, map_location=DEVICE)
         classifier.load_state_dict(model_state["model"])
 
-        accuracy = validate(classifier, test_loader, DEVICE)
+        accuracy = validate(classifier, test_loader, DEVICE, METHOD, N_WAY)
         print(f'Accuracy sui dati di test: {accuracy}%.')
 
 
