@@ -672,9 +672,6 @@ class Classifier:
                 item_decision = torch.argmax(item_output, dim=1)
                 batch_item_decisions.append(item_decision)
 
-                print(item_decision.item())
-                print(item_label.item())
-
                 # loss del batch e backward step
 
                 super_class_loss = criterion(super_class_logit, super_class_label)  # loss sulle classi
