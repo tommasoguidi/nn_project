@@ -319,10 +319,7 @@ class Classifier:
             self.num_classes = len(mapping)
             if self.backbone == 'resnet':
                 # carico il modello di resnet50 senza pretrain perchè alleno solo il layer finale
-                self.model = resnet50()
-                # prima di caricare i pesi del classificatore allenato lo devo modificare come era stato fatto
-                # in precedenza, quindi modifico il layer finale della resnet
-                self.model.fc = nn.Linear(2048, 10)
+                self.model = resnet50(num_classes=10)
                 self.load(weights)
                 # # congelo i parametri per allenare solo il layer finale
                 for p in self.model.parameters():
