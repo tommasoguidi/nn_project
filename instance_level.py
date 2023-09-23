@@ -13,7 +13,7 @@ from torch.utils.tensorboard import SummaryWriter
 import torch.nn as nn
 import torch.nn.functional as F
 from torchvision.transforms import Compose, RandomHorizontalFlip, RandomAffine, ToTensor, Normalize
-from torchvision.models.resnet import resnet50
+from torchvision.models.resnet import resnet50, resnet18
 from torchinfo import summary
 
 
@@ -195,25 +195,43 @@ class Head(nn.Module):
 
 class MyResNet(nn.Module):
     """Riscrivo il forward della ResNet originaria per prelevare il vettore delle features"""
-    def __init__(self, num_super_classes, pretrained, weights, device):
+    def __init__(self, backbone, num_super_classes, pretrained, weights, device):
         super().__init__()
         self.device = device
-        if pretrained:
-            self.resnet = resnet50(num_classes=num_super_classes)
-            model_state = torch.load(weights, map_location=self.device)
-            self.resnet.load_state_dict(model_state["model"])
-            # congelo i parametri per allenare solo il layer finale
-            for p in self.resnet.parameters():
-                p.requires_grad = False
-        else:
-            self.resnet = resnet50(weights='DEFAULT', progress=True)    # carico i pesi di imagenet
-            # congelo i parametri tranne quelli dell'ultimo bottleneck
-            blocks = list(self.resnet.children())
-            for b in blocks[:-3]:
-                for p in b.parameters():
+        if backbone == 'resnet':
+            if pretrained:
+                self.resnet = resnet50(num_classes=num_super_classes)
+                model_state = torch.load(weights, map_location=self.device)
+                self.resnet.load_state_dict(model_state["model"])
+                # congelo i parametri per allenare solo il layer finale
+                for p in self.resnet.parameters():
                     p.requires_grad = False
-            # modifico il linear layer per la classificazione della super classe
-            self.resnet.fc = nn.Linear(2048, num_super_classes)
+            else:
+                self.resnet = resnet50(weights='DEFAULT', progress=True)    # carico i pesi di imagenet
+                # congelo i parametri tranne quelli dell'ultimo bottleneck
+                blocks = list(self.resnet.children())
+                for b in blocks[:-3]:
+                    for p in b.parameters():
+                        p.requires_grad = False
+                # modifico il linear layer per la classificazione della super classe
+                self.resnet.fc = nn.Linear(2048, num_super_classes)
+        elif backbone == 'resnet18':
+            if pretrained:
+                self.resnet = resnet18(num_classes=num_super_classes)
+                model_state = torch.load(weights, map_location=self.device)
+                self.resnet.load_state_dict(model_state["model"])
+                # congelo i parametri per allenare solo il layer finale
+                for p in self.resnet.parameters():
+                    p.requires_grad = False
+            else:
+                self.resnet = resnet18(weights='DEFAULT', progress=True)    # carico i pesi di imagenet
+                # congelo i parametri tranne quelli dell'ultimo bottleneck
+                # blocks = list(self.resnet.children())
+                # for b in blocks[:-3]:
+                #     for p in b.parameters():
+                #         p.requires_grad = False
+                # modifico il linear layer per la classificazione della super classe
+                self.resnet.fc = nn.Linear(512, num_super_classes)
 
     def forward(self, x):
         # implementazione ufficiale pytorch del forward, modificata per ritornare il feature vector
@@ -239,9 +257,11 @@ class MoE(nn.Module):
     Il modulo è composto dalla resnet preallenata su imagenet e una lista di classification heads, una per ciascuna
     classe.
     """
-    def __init__(self, num_super_classes: int, len_item_classes: list, pretrained: bool, weights: Path, device: str):
+    def __init__(self, backbone: str, num_super_classes: int, len_item_classes: list,
+                 pretrained: bool, weights: Path, device: str):
         """
 
+        :param num_super_classes:   'resnet' o 'resnet18'.
         :param num_super_classes:   numero delle super classi.
         :param len_item_classes:    lista con il numero di prodotti per ciascuna super classe
                                     -> len_item_classes[i] è il numero di prodotti della classe i.
@@ -253,7 +273,7 @@ class MoE(nn.Module):
         self.num_super_classes = num_super_classes
         self.len_item_classes = len_item_classes
         # metto la mia resnet con forward modificato
-        self.resnet = MyResNet(self.num_super_classes, pretrained, weights, device)
+        self.resnet = MyResNet(backbone, self.num_super_classes, pretrained, weights, device)
         # creo un'istanza della classe Head() per ogni super classe e la aggiungo alla ModuleList
         # la i-esima istanza ha come in_features la dimensione delle feature uscenti dalla resnet dopo flatten() (2048)
         # e come classes il numero dei prodotti appartenenti alla i-esima super class
@@ -278,9 +298,10 @@ class MoE(nn.Module):
 class Classifier:
     """Classificatore per le 50 classi in esame"""
 
-    def __init__(self, method: str, device: str, ckpt_dir: Path, mapping: dict, weights: Path, pretrained: bool):
+    def __init__(self, backbone: str, method: str, device: str, ckpt_dir: Path, mapping: dict, weights: Path, pretrained: bool):
         """
 
+        :param method:      una tra 'resnet' e resnet18'.
         :param method:      come classificare le varie istanze (naive o mixture of expert).
         :param device:      per decidere se svolgere i conti sulla cpu o sulla gpu.
         :param ckpt_dir:    directory in cui salvare i risultati dei vari esperimetni di train.
@@ -288,6 +309,7 @@ class Classifier:
         :param weights:     percorso dei pesi da caricare.
         :param pretrained:  se usare o meno il modello preallenato come backbone di MoE.
         """
+        self.backbone = backbone
         self.method = method
         self.device = device
         self.ckpt_dir = ckpt_dir
@@ -295,22 +317,27 @@ class Classifier:
         self.pretrained = pretrained
         if self.method == 'naive':
             self.num_classes = len(mapping)
-            # carico il modello di resnet50 senza pretrain
-            self.model = resnet50()
-            # prima di caricare i pesi del classificatore allenato lo devo modificare come era stato fatto
-            # in precedenza, quindi modifico il layer finale della resnet
-            self.model.fc = nn.Linear(2048, 10)
-            self.load(weights)
-            # # congelo i parametri per allenare solo il layer finale
-            for p in self.model.parameters():
-                p.requires_grad = False
-            # congelo i parametri tranne quelli degli ultimi 3 blocchi
-            # blocks = list(self.model.children())
-            # for b in blocks[:-3]:
-            #     for p in b.parameters():
-            #         p.requires_grad = False
-            # layer finale, a questo giro tanti neuroni quanto il numero di singoli prodotti
-            self.model.fc = nn.Linear(2048, self.num_classes)
+            if self.backbone == 'resnet':
+                # carico il modello di resnet50 senza pretrain perchè alleno solo il layer finale
+                self.model = resnet50()
+                # prima di caricare i pesi del classificatore allenato lo devo modificare come era stato fatto
+                # in precedenza, quindi modifico il layer finale della resnet
+                self.model.fc = nn.Linear(2048, 10)
+                self.load(weights)
+                # # congelo i parametri per allenare solo il layer finale
+                for p in self.model.parameters():
+                    p.requires_grad = False
+                # layer finale, a questo giro tanti neuroni quanto il numero di singoli prodotti
+                self.model.fc = nn.Linear(2048, self.num_classes)
+            elif self.backbone == 'resnet18':
+                self.model = resnet18(weights='DEFAULT', progress=True)
+                # congelo i parametri tranne quelli degli ultimi 3 blocchi
+                # blocks = list(self.model.children())
+                # for b in blocks[:-3]:
+                #     for p in b.parameters():
+                #         p.requires_grad = False
+                # layer finale, a questo giro tanti neuroni quanto il numero di singoli prodotti
+                self.model.fc = nn.Linear(512, self.num_classes)
             # stampa a schermo la rete
             # summary(self.model, input_size=(1, 3, 224, 224))
 
@@ -319,7 +346,8 @@ class Classifier:
             # lista con il numero di sottoclassi per ogni superclasse (-1 perchè va scartato l'identifier della superclasse)
             self.len_item_classes = [len(mapping[key]) - 1 for key in mapping]
             # carico il modello pretrainato di resnet50 su imagenet
-            self.model = MoE(self.num_super_classes, self.len_item_classes, self.pretrained, weights, self.device)
+            self.model = MoE(self.backbone, self.num_super_classes, self.len_item_classes,
+                             self.pretrained, weights, self.device)
             # stampa a schermo la rete
             # summary(self.model, input_size=(1, 3, 224, 224), super_class=1)
 
@@ -820,6 +848,7 @@ def main(args):
     MODE = args.mode
     N_FOLDS = args.n_folds
     DEVICE = args.device
+    BACKBONE = args.backbone
     EPOCHS = args.epochs
     BATCH_SIZE = args.batch_size
     NUM_WORKERS = args.num_workers
@@ -890,7 +919,7 @@ def main(args):
             train_ds = Concat(train_datasets)
             train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
 
-            cls = Classifier(METHOD, DEVICE, actual_dir, class_mapping, WEIGHTS, PRETRAINED)
+            cls = Classifier(BACKBONE, METHOD, DEVICE, actual_dir, class_mapping, WEIGHTS, PRETRAINED)
             train_result = cls.train(train_loader, val_loader, i, EPOCHS, LR)      # alleno
             best_results.append(train_result)
 
@@ -944,7 +973,7 @@ if __name__ == '__main__':
                         help='Scegliere se usare la gpu ("cuda") o la "cpu". (C, I, F)')
     parser.add_argument('-b', '--backbone', type=str, default='resnet',
                         help='Scegliere se utilizzare una semplice "cnn", "resnet" (50) o "resnet18" '
-                             'come features extractor. (C, F)')
+                             'come features extractor. (C, I, F)')
     parser.add_argument('-e', '--epochs', type=int, default=25, help='Epoche per eseguire il train. (C, I, F)')
     parser.add_argument('--batch-size', type=int, default=16, help='Numero di esempi in ogni batch. (C, I)')
     parser.add_argument('--num-workers', type=int, default=3, help='Numero di worker. (C, I, F)')
