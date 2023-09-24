@@ -7,6 +7,7 @@ from pathlib import Path
 from tqdm import tqdm
 import argparse
 import cv2
+import json
 
 import torch
 from torch.utils.data import DataLoader
@@ -321,6 +322,8 @@ def main(args):
             past_experiments = len(
                 os.listdir(CHECKPOINT_DIR))  # la prima si chiamerà run_0, la seconda run_1 e così via
             actual_dir = CHECKPOINT_DIR / f'run_{past_experiments}'  # qui salvo i risultati degli esperimenti
+            with open(actual_dir / 'info.txt', 'w') as f:
+                json.dump(arguments.__dict__, f, indent=2)
             for i in range(N_FOLDS):
                 # makedirs crea tutte le cartelle intermedie che ancora non esistono specificate nel path
                 # exists_ok fa si che se una cartella esiste già non c'è un errore

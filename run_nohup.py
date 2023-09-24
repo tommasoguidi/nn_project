@@ -1,6 +1,7 @@
 import os
 import argparse
 from pathlib import Path
+import json
 
 
 def run_nohup(args):
@@ -22,6 +23,9 @@ def run_nohup(args):
         # exists_ok fa si che se una cartella esiste già non c'è un errore
         os.makedirs(dest / f'fold_{i}', exist_ok=True)  # qui salvo i risultati del singolo split
     total_path = dest / 'run_events.out'
+
+    with open(dest / 'info.txt', 'w') as f:
+        json.dump(arguments.__dict__, f, indent=2)
 
     command = f'nohup python {args.script}.py'
     for flag in vars(args):
