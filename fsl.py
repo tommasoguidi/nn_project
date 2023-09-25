@@ -218,13 +218,23 @@ def training_epoch(model: FewShotClassifier, dataloader: DataLoader, optimizer: 
     for sample in progress:
         support_images, support_labels, query_images, query_labels, _ = sample
 
-        # output della rete
-        model.process_support_set(support_images.to(device), support_labels.to(device))
-        classification_scores = model(query_images.to(device))
-
+        support_images, support_labels = support_images.to(device), support_labels.to(device)
         if method == 'rel':
             query_labels = F.one_hot(query_labels, num_classes=n_way).type(torch.float)
-        episode_loss = criterion(classification_scores, query_labels.to(device))
+        query_images, query_labels = query_images.to(device), query_labels.to(device)
+        # output della rete
+        model.process_support_set(support_images, support_labels)  # usa il support set per fine tuning
+        classification_scores = model(query_images)
+        # loss del batch e backward step
+        episode_loss = criterion(classification_scores, query_labels)
+
+        # # output della rete
+        # model.process_support_set(support_images.to(device), support_labels.to(device))
+        # classification_scores = model(query_images.to(device))
+        #
+        # if method == 'rel':
+        #     query_labels = F.one_hot(query_labels, num_classes=n_way).type(torch.float)
+        # episode_loss = criterion(classification_scores, query_labels.to(device))
         episode_loss.backward()
         optimizer.step()
         optimizer.zero_grad()
