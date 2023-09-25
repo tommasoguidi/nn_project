@@ -185,8 +185,8 @@ def train_one_epoch(model: FewShotClassifier, dataloader: DataLoader, optimizer:
     for sample in progress:
         support_images, support_labels, query_images, query_labels, _ = sample
         support_images, support_labels = support_images.to(device), support_labels.to(device)
-        # if method == 'rel':
-        #     query_labels = F.one_hot(query_labels, num_classes=n_way).type(torch.float)
+        if method == 'rel':
+            query_labels = F.one_hot(query_labels, num_classes=n_way).type(torch.float)
         query_images, query_labels = query_images.to(device), query_labels.to(device)
         # output della rete
         model.process_support_set(support_images, support_labels)   # usa il support set per fine tuning
@@ -349,9 +349,9 @@ def main(args):
             val_sampler = TaskSampler(val_ds, n_way=N_WAY, n_shot=K_SHOT, n_query=N_QUERY, n_tasks=VAL_EPISODES)
 
             # collate_fn custom che restituisce (support_images, support_labels, query_images, query_labels, class_ids)
-            train_loader = DataLoader(train_ds, batch_sampler=train_sampler, num_workers=NUM_WORKERS, pin_memory=False,
+            train_loader = DataLoader(train_ds, batch_sampler=train_sampler, num_workers=NUM_WORKERS, pin_memory=True,
                                       collate_fn=train_sampler.episodic_collate_fn)
-            val_loader = DataLoader(val_ds, batch_sampler=val_sampler, num_workers=NUM_WORKERS, pin_memory=False,
+            val_loader = DataLoader(val_ds, batch_sampler=val_sampler, num_workers=NUM_WORKERS, pin_memory=True,
                                     collate_fn=val_sampler.episodic_collate_fn)
 
             # cls = Classifier(METHOD, DEVICE, actual_dir, class_mapping, WEIGHTS, PRETRAINED)
