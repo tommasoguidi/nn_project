@@ -220,7 +220,8 @@ def training_epoch(model: FewShotClassifier, dataloader: DataLoader, optimizer: 
         support_images, support_labels = support_images.to(device), support_labels.to(device)
         # output della rete
         model.process_support_set(support_images, support_labels)
-        classification_scores = model(query_images.to(device))
+        query_images = query_images.to(device)
+        classification_scores = model(query_images)
 
         if method == 'rel':
             query_labels = F.one_hot(query_labels, num_classes=n_way).type(torch.float)
