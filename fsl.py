@@ -210,7 +210,7 @@ def training_epoch(model: FewShotClassifier, data_loader: DataLoader, optimizer:
                    criterion, device, method, n_way):
     all_loss = []
     model.train()  # modalità train
-    # optimizer.zero_grad()  # svuoto i gradienti
+    optimizer.zero_grad()  # svuoto i gradienti
     with tqdm(enumerate(data_loader), total=len(data_loader), desc="Training") as tqdm_train:
         for episode_index, (support_images, support_labels, query_images, query_labels, _,) in tqdm_train:
             optimizer.zero_grad()
