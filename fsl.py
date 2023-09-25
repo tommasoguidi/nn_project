@@ -209,7 +209,8 @@ def train_one_epoch(model: FewShotClassifier, dataloader: DataLoader, optimizer:
 def training_epoch(model: FewShotClassifier, data_loader: DataLoader, optimizer: torch.optim.Optimizer,
                    criterion, device, method, n_way):
     all_loss = []
-    model.train()
+    model.train()  # modalità train
+    # optimizer.zero_grad()  # svuoto i gradienti
     with tqdm(enumerate(data_loader), total=len(data_loader), desc="Training") as tqdm_train:
         for episode_index, (support_images, support_labels, query_images, query_labels, _,) in tqdm_train:
             optimizer.zero_grad()
@@ -282,8 +283,8 @@ def train(epochs: int, model: FewShotClassifier, train_loader: DataLoader, val_l
     progress = tqdm(range(epochs), total=epochs, leave=False, desc='COMPLETED EPOCHS')
     for epoch in progress:
         # alleno la rete su tutti gli esempi del train set (1 epoca)
-        epoch_mean_loss = train_one_epoch(model, train_loader, optimizer, criterion, device, method, n_way)
-        # epoch_mean_loss = training_epoch(model, train_loader, optimizer, criterion, device, method, n_way)
+        # epoch_mean_loss = train_one_epoch(model, train_loader, optimizer, criterion, device, method, n_way)
+        epoch_mean_loss = training_epoch(model, train_loader, optimizer, criterion, device, method, n_way)
         writer.add_scalar(f'Loss/Train', epoch_mean_loss, epoch + 1)
         # valido il modello attuale sul validation set e ottengo l'accuratezza attuale
         acc_now = validate(model, val_loader, device, method, n_way)
