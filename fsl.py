@@ -217,7 +217,8 @@ def training_epoch(model: FewShotClassifier, dataloader: DataLoader, optimizer: 
     epoch_loss = 0.0  # inizializzo la loss
     for sample in progress:
         support_images, support_labels, query_images, query_labels, _ = sample
-        optimizer.zero_grad()
+
+        # output della rete
         model.process_support_set(support_images.to(device), support_labels.to(device))
         classification_scores = model(query_images.to(device))
 
@@ -226,6 +227,7 @@ def training_epoch(model: FewShotClassifier, dataloader: DataLoader, optimizer: 
         episode_loss = criterion(classification_scores, query_labels.to(device))
         episode_loss.backward()
         optimizer.step()
+        optimizer.zero_grad()
 
         # accumulo le metriche di interesse
         epoch_loss += episode_loss.item()  # avendo usato reduction='sum' nella loss qui sto sommando la loss totale
