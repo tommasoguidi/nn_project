@@ -208,7 +208,7 @@ def train_one_epoch(model: FewShotClassifier, dataloader: DataLoader, optimizer:
 
 def training_epoch(model: FewShotClassifier, dataloader: DataLoader, optimizer: torch.optim.Optimizer,
                    criterion, device, method, n_way):
-    all_loss = []
+
     model.train()  # modalità train
     optimizer.zero_grad()  # svuoto i gradienti
 
@@ -223,15 +223,17 @@ def training_epoch(model: FewShotClassifier, dataloader: DataLoader, optimizer: 
 
         if method == 'rel':
             query_labels = F.one_hot(query_labels, num_classes=n_way).type(torch.float)
-        loss = criterion(classification_scores, query_labels.to(device))
-        loss.backward()
+        episode_loss = criterion(classification_scores, query_labels.to(device))
+        episode_loss.backward()
         optimizer.step()
 
-        all_loss.append(loss.item())
+        # accumulo le metriche di interesse
+        epoch_loss += episode_loss.item()  # avendo usato reduction='sum' nella loss qui sto sommando la loss totale
+        postfix = {'batch_mean_loss': episode_loss.item() / query_labels.shape[0]}
+        progress.set_postfix(postfix)
 
-        progress.set_postfix(loss=mean(all_loss))
-
-    return mean(all_loss)
+    epoch_mean_loss = epoch_loss / n_episodes  # loss media sull'epoca
+    return epoch_mean_loss
 
 
 @torch.no_grad()
