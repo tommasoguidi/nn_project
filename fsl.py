@@ -206,26 +206,30 @@ def train_one_epoch(model: FewShotClassifier, dataloader: DataLoader, optimizer:
     return epoch_mean_loss
 
 
-def training_epoch(model: FewShotClassifier, data_loader: DataLoader, optimizer: torch.optim.Optimizer,
+def training_epoch(model: FewShotClassifier, dataloader: DataLoader, optimizer: torch.optim.Optimizer,
                    criterion, device, method, n_way):
     all_loss = []
     model.train()  # modalità train
     optimizer.zero_grad()  # svuoto i gradienti
-    with tqdm(enumerate(data_loader), total=len(data_loader), desc="Training") as tqdm_train:
-        for episode_index, (support_images, support_labels, query_images, query_labels, _,) in tqdm_train:
-            optimizer.zero_grad()
-            model.process_support_set(support_images.to(device), support_labels.to(device))
-            classification_scores = model(query_images.to(device))
 
-            if method == 'rel':
-                query_labels = F.one_hot(query_labels, num_classes=n_way).type(torch.float)
-            loss = criterion(classification_scores, query_labels.to(device))
-            loss.backward()
-            optimizer.step()
+    n_episodes = len(dataloader)
+    progress = tqdm(dataloader, total=n_episodes, leave=False, desc='COMPLETED EPISODES')
+    epoch_loss = 0.0  # inizializzo la loss
+    for sample in progress:
+        support_images, support_labels, query_images, query_labels, _ = sample
+        optimizer.zero_grad()
+        model.process_support_set(support_images.to(device), support_labels.to(device))
+        classification_scores = model(query_images.to(device))
 
-            all_loss.append(loss.item())
+        if method == 'rel':
+            query_labels = F.one_hot(query_labels, num_classes=n_way).type(torch.float)
+        loss = criterion(classification_scores, query_labels.to(device))
+        loss.backward()
+        optimizer.step()
 
-            tqdm_train.set_postfix(loss=mean(all_loss))
+        all_loss.append(loss.item())
+
+        progress.set_postfix(loss=mean(all_loss))
 
     return mean(all_loss)
 
