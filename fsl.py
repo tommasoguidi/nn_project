@@ -217,9 +217,9 @@ def training_epoch(model: FewShotClassifier, dataloader: DataLoader, optimizer: 
     epoch_loss = 0.0  # inizializzo la loss
     for sample in progress:
         support_images, support_labels, query_images, query_labels, _ = sample
-
+        support_images, support_labels = support_images.to(device), support_labels.to(device)
         # output della rete
-        model.process_support_set(support_images.to(device), support_labels.to(device))
+        model.process_support_set(support_images, support_labels)
         classification_scores = model(query_images.to(device))
 
         if method == 'rel':
