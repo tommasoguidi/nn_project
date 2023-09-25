@@ -282,8 +282,8 @@ def train(epochs: int, model: FewShotClassifier, train_loader: DataLoader, val_l
     progress = tqdm(range(epochs), total=epochs, leave=False, desc='COMPLETED EPOCHS')
     for epoch in progress:
         # alleno la rete su tutti gli esempi del train set (1 epoca)
-        # epoch_mean_loss = train_one_epoch(model, train_loader, optimizer, criterion, device, method, n_way)
-        epoch_mean_loss = training_epoch(model, train_loader, optimizer, criterion, device, method, n_way)
+        epoch_mean_loss = train_one_epoch(model, train_loader, optimizer, criterion, device, method, n_way)
+        # epoch_mean_loss = training_epoch(model, train_loader, optimizer, criterion, device, method, n_way)
         writer.add_scalar(f'Loss/Train', epoch_mean_loss, epoch + 1)
         # valido il modello attuale sul validation set e ottengo l'accuratezza attuale
         acc_now = validate(model, val_loader, device, method, n_way)
