@@ -313,6 +313,11 @@ def main(args):
                           RandomHorizontalFlip(p=0.5),
                           Normalize(mean=torch.tensor([0.485, 0.456, 0.406]),
                                     std=torch.tensor([0.229, 0.224, 0.225]))])
+    t = torch.cuda.get_device_properties(0).total_memory
+    r = torch.cuda.memory_reserved(0)
+    a = torch.cuda.memory_allocated(0)
+
+    print(f'total: {t}\nreserved: {r}\nallocated: {a}')
 
     if MODE == 'train':
         if not NOHUP:
