@@ -8,6 +8,7 @@ from tqdm import tqdm
 import argparse
 import cv2
 import json
+from statistics import mean
 
 import torch
 from torch.utils.data import DataLoader
@@ -205,6 +206,29 @@ def train_one_epoch(model: FewShotClassifier, dataloader: DataLoader, optimizer:
     return epoch_mean_loss
 
 
+def training_epoch(model: FewShotClassifier, data_loader: DataLoader, optimizer: torch.optim.Optimizer,
+                   criterion, device, method, n_way):
+    all_loss = []
+    model.train()
+    with tqdm(enumerate(data_loader), total=len(data_loader), desc="Training") as tqdm_train:
+        for episode_index, (support_images, support_labels, query_images, query_labels, _,) in tqdm_train:
+            optimizer.zero_grad()
+            model.process_support_set(support_images.to(device), support_labels.to(device))
+            classification_scores = model(query_images.to(device))
+
+            if method == 'rel':
+                query_labels = F.one_hot(query_labels, num_classes=n_way).type(torch.float)
+            loss = criterion(classification_scores, query_labels.to(device))
+            loss.backward()
+            optimizer.step()
+
+            all_loss.append(loss.item())
+
+            tqdm_train.set_postfix(loss=mean(all_loss))
+
+    return mean(all_loss)
+
+
 @torch.no_grad()
 def validate(model: FewShotClassifier, val_loader: DataLoader, device: torch.device, method: str, n_way: int):
     model.eval()  # passa in modalità eval
@@ -259,6 +283,7 @@ def train(epochs: int, model: FewShotClassifier, train_loader: DataLoader, val_l
     for epoch in progress:
         # alleno la rete su tutti gli esempi del train set (1 epoca)
         epoch_mean_loss = train_one_epoch(model, train_loader, optimizer, criterion, device, method, n_way)
+        epoch_mean_loss = training_epoch(model, train_loader, optimizer, criterion, device, method, n_way)
         writer.add_scalar(f'Loss/Train', epoch_mean_loss, epoch + 1)
         # valido il modello attuale sul validation set e ottengo l'accuratezza attuale
         acc_now = validate(model, val_loader, device, method, n_way)
@@ -313,11 +338,12 @@ def main(args):
                           RandomHorizontalFlip(p=0.5),
                           Normalize(mean=torch.tensor([0.485, 0.456, 0.406]),
                                     std=torch.tensor([0.229, 0.224, 0.225]))])
-    t = torch.cuda.get_device_properties(0).total_memory
-    r = torch.cuda.memory_reserved(0)
-    a = torch.cuda.memory_allocated(0)
 
-    print(f'total: {t}\nreserved: {r}\nallocated: {a}')
+    # t = torch.cuda.get_device_properties(0).total_memory
+    # r = torch.cuda.memory_reserved(0)
+    # a = torch.cuda.memory_allocated(0)
+    #
+    # print(f'total: {t}\nreserved: {r}\nallocated: {a}')
 
     if MODE == 'train':
         if not NOHUP:
