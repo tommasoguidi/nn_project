@@ -328,9 +328,9 @@ class Classifier:
             batch_correct = torch.sum(batch_decisions == labels)  # risposte corrette per il batch attuale
             epoch_correct += batch_correct.item()      # totale risposte corrette sull'epoca
 
-            print(outputs)
-            print(batch_decisions)
-            print(labels)
+            # print(outputs)
+            print(f'decisione: {batch_decisions}')
+            print(f'ground truth:{labels}')
 
             postfix = {'batch_mean_loss': batch_loss.item() / batch_cases,
                        'batch_accuracy': (batch_correct.item() / batch_cases) * 100.0}
