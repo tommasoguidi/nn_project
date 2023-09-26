@@ -187,11 +187,13 @@ def train_one_epoch(model: FewShotClassifier, dataloader: DataLoader, optimizer:
         support_images, support_labels = support_images.to(device), support_labels.to(device)
         # output della rete
         model.process_support_set(support_images, support_labels)
-        classification_scores = model(query_images.to(device))
+        query_images = query_images.to(device)
+        classification_scores = model(query_images)
         if method == 'rel':
             query_labels = F.one_hot(query_labels, num_classes=n_way).type(torch.float)
         # loss del batch e backward step
-        episode_loss = criterion(classification_scores, query_labels.to(device))
+        query_labels = query_labels.to(device)
+        episode_loss = criterion(classification_scores, query_labels)
         episode_loss.backward()
         optimizer.step()
         optimizer.zero_grad()
@@ -205,7 +207,7 @@ def train_one_epoch(model: FewShotClassifier, dataloader: DataLoader, optimizer:
 
 
 @torch.no_grad()
-def validate(model: FewShotClassifier, val_loader: DataLoader, device: torch.device, method: str, n_way: int):
+def validate(model: FewShotClassifier, val_loader: DataLoader, device: torch.device):
     model.eval()  # passa in modalità eval
 
     n_episodes = len(val_loader)
@@ -215,8 +217,6 @@ def validate(model: FewShotClassifier, val_loader: DataLoader, device: torch.dev
     for sample in progress:
         support_images, support_labels, query_images, query_labels, _ = sample
         support_images, support_labels = support_images.to(device), support_labels.to(device)
-        # if method == 'rel':
-        #     query_labels = F.one_hot(query_labels, num_classes=n_way).type(torch.float)
         query_images, query_labels = query_images.to(device), query_labels.to(device)
 
         episode_cases = query_labels.shape[0]  # numero di sample nel batch
@@ -260,7 +260,7 @@ def train(epochs: int, model: FewShotClassifier, train_loader: DataLoader, val_l
         epoch_mean_loss = train_one_epoch(model, train_loader, optimizer, criterion, device, method, n_way)
         writer.add_scalar(f'Loss/Train', epoch_mean_loss, epoch + 1)
         # valido il modello attuale sul validation set e ottengo l'accuratezza attuale
-        acc_now = validate(model, val_loader, device, method, n_way)
+        acc_now = validate(model, val_loader, device)
         writer.add_scalar(f'Accuracy/Val', acc_now, epoch + 1)
         # scelgo il modello migliore e lo salvo
         if acc_now > best_acc:
