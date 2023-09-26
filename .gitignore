@@ -2,3 +2,5 @@ runs/
 .idea/
 prove.py
 classifier.pth
+get_logs.py
+
