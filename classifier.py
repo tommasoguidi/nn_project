@@ -212,7 +212,7 @@ class Classifier:
 
         self.model.to(self.device)
         # # stampa a schermo la rete
-        # summary(self.model, input_size=(1, 3, 224, 224))
+        summary(self.model, input_size=(1, 3, 224, 224))
 
     def load(self, weights: Path):
         """
@@ -329,8 +329,8 @@ class Classifier:
             epoch_correct += batch_correct.item()      # totale risposte corrette sull'epoca
 
             # print(outputs)
-            print(f'decisione: {batch_decisions}')
-            print(f'ground truth:{labels}')
+            # print(f'decisione: {batch_decisions}')
+            # print(f'ground truth:{labels}')
 
             postfix = {'batch_mean_loss': batch_loss.item() / batch_cases,
                        'batch_accuracy': (batch_correct.item() / batch_cases) * 100.0}
