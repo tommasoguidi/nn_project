@@ -307,6 +307,11 @@ def main(args):
                                                 'network ("proto"), matching network ("match") o relation network ' \
                                                 '("rel").'
 
+    backbones = {'resnet': {'arch': resnet50(), 'f_dim': 2048},
+                 'resnet18': {'arch': resnet18(), 'f_dim': 512}}
+    bb = backbones[BACKBONE]['arch']
+    f_dim = backbones[BACKBONE]['f_dim']
+
     transforms = Compose([ToTensor(),
                           RandomAffine(45, translate=(0.1, 0.1), scale=(0.8, 1.2), fill=255),
                           RandomHorizontalFlip(p=0.5),
@@ -359,33 +364,19 @@ def main(args):
             val_loader = DataLoader(val_ds, batch_sampler=val_sampler, num_workers=NUM_WORKERS, pin_memory=True,
                                     collate_fn=val_sampler.episodic_collate_fn)
 
-            # cls = Classifier(METHOD, DEVICE, actual_dir, class_mapping, WEIGHTS, PRETRAINED)
-            # train_result = cls.train(train_loader, val_loader, i, EPOCHS, LR)      # alleno
-            # best_results.append(train_result)
-            # ora bisogna distinguere le varie backbone e i vari metodi che vogliamo usare, perchè sono tutti diversi
-            backbones = {'resnet': resnet50(), 'resnet18': resnet18()}
-            bb = backbones[BACKBONE]
+            # adesso distinguo il metodo da usare
             if METHOD == 'proto':
                 # la prototypical è la più normale di tutte
                 classifier = PrototypicalNetworks(bb).to(DEVICE)
                 criterion = nn.CrossEntropyLoss(reduction='sum')
             elif METHOD == 'rel':
-                # relation network vuole la featuremap prima del flatten, quindi bisogna dire alla backbone di no fare
-                # il pooling e impostare come feature_dimension la prima dimensione della feature map che è 28
-                # in entrambi i casi, nel paper usano la Mean Square Error e noi li seguiamo
+                # relation network vuole la featuremap prima del flatten, quindi bisogna dire alla backbone di non fare
+                # il pooling e impostare come feature_dimension la prima dimensione della feature map che è la depth
                 bb.use_pooling = False
-                f_dim = 512
                 classifier = RelationNetworks(backbone=bb, feature_dimension=f_dim).to(DEVICE)
                 criterion = nn.MSELoss(reduction='sum')
             elif METHOD == 'match':
-                # qui cambiano le dimensioni del vettore delle feature e dato che la matching network restituisce delle
-                # log-probabilities, quindi andremo a usare la Negative Log Likelihood Loss
-                # if BACKBONE == 'resnet':
-                #     f_dim = 2048
-                # elif BACKBONE == 'resnet18':
-                #     f_dim = 512
-                f_dim = 2048
-                classifier = MatchingNetworks(backbone=resnet50(), feature_dimension=f_dim).to(DEVICE)
+                classifier = MatchingNetworks(backbone=bb, feature_dimension=f_dim).to(DEVICE)
                 criterion = nn.NLLLoss(reduction='sum')
 
             # adesso ho il classificatore e la loss function, mi manca da definire l'optimizer e il summary per il log
@@ -409,27 +400,17 @@ def main(args):
         test_sampler = TaskSampler(test_ds, n_way=N_WAY, n_shot=K_SHOT, n_query=N_QUERY, n_tasks=TEST_EPISODES)
         test_loader = DataLoader(test_ds, batch_sampler=test_sampler, num_workers=NUM_WORKERS, pin_memory=False,
                                  collate_fn=test_sampler.episodic_collate_fn)
-        backbones = {'resnet': resnet50(), 'resnet18': resnet18()}
-        bb = backbones[BACKBONE]
+        # adesso distinguo il metodo da usare
         if METHOD == 'proto':
             # la prototypical è la più normale di tutte
             classifier = PrototypicalNetworks(bb).to(DEVICE)
         elif METHOD == 'rel':
-            # relation network vuole la featuremap prima del flatten, quindi bisogna dire alla backbone di no fare
-            # il pooling e impostare come feature_dimension la prima dimensione della feature map che è 28
-            # in entrambi i casi, nel paper usano la Mean Square Error e noi li seguiamo
+            # relation network vuole la featuremap prima del flatten, quindi bisogna dire alla backbone di non fare
+            # il pooling e impostare come feature_dimension la prima dimensione della feature map che è la depth
             bb.use_pooling = False
-            f_dim = 28
             classifier = RelationNetworks(backbone=bb, feature_dimension=f_dim).to(DEVICE)
         elif METHOD == 'match':
-            # qui cambiano le dimensioni del vettore delle feature e dato che la matching network restituisce delle
-            # log-probabilities, quindi andremo a usare la Negative Log Likelihood Loss
-            # if BACKBONE == 'resnet':
-            #     f_dim = 2048
-            # elif BACKBONE == 'resnet18':
-            #     f_dim = 512
-            f_dim = 2048
-            classifier = MatchingNetworks(backbone=resnet50(), feature_dimension=f_dim).to(DEVICE)
+            classifier = MatchingNetworks(backbone=bb, feature_dimension=f_dim).to(DEVICE)
 
         model_state = torch.load(WEIGHTS, map_location=DEVICE)
         classifier.load_state_dict(model_state["model"])
