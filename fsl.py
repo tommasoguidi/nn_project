@@ -8,7 +8,6 @@ from tqdm import tqdm
 import argparse
 import cv2
 import json
-from statistics import mean
 
 import torch
 from torch.utils.data import DataLoader
@@ -206,6 +205,48 @@ def train_one_epoch(model: FewShotClassifier, dataloader: DataLoader, optimizer:
     return epoch_mean_loss
 
 
+def fast_train_one_epoch(model: FewShotClassifier, dataloader: DataLoader, optimizer: torch.optim.Optimizer,
+                         criterion: nn.Module, device: torch.device, method: str, n_way: int):
+    """
+    Allena la rete per un'epoca.
+
+    :param model:       il modello(già sul giusto device).
+    :param dataloader:  il dataloader del dataset di train.
+    :param optimizer:   per aggiornare i parametri.
+    :param criterion:   per la loss.
+    :param device:      cuda o cpu.
+    :param method:      metodo usato.
+    :param n_way:       numero di classi.
+    :return:
+    """
+    model.train()  # modalità train
+    optimizer.zero_grad()  # svuoto i gradienti
+    n_episodes = len(dataloader)
+    progress = tqdm(dataloader, total=n_episodes, leave=False, desc='COMPLETED EPISODES')
+    epoch_loss = 0.0  # inizializzo la loss
+    for sample in progress:
+        support_images, support_labels, query_images, query_labels, _ = sample
+        support_images, support_labels = support_images.to(device), support_labels.to(device)
+        query_images, query_labels = query_images.to(device), query_labels.to(device)
+        if method == 'rel':
+            query_labels = F.one_hot(query_labels, num_classes=n_way).type(torch.float)
+        # output della rete
+        model.process_support_set(support_images, support_labels)
+        classification_scores = model(query_images)
+        # loss del batch e backward step
+        episode_loss = criterion(classification_scores, query_labels)
+        episode_loss.backward()
+        optimizer.step()
+        optimizer.zero_grad()
+        # accumulo le metriche di interesse
+        epoch_loss += episode_loss.item()  # avendo usato reduction='sum' nella loss qui sto sommando la loss totale
+        postfix = {'batch_mean_loss': episode_loss.item() / query_labels.shape[0]}
+        progress.set_postfix(postfix)
+
+    epoch_mean_loss = epoch_loss / n_episodes        # loss media sull'epoca
+    return epoch_mean_loss
+
+
 @torch.no_grad()
 def validate(model: FewShotClassifier, val_loader: DataLoader, device: torch.device):
     model.eval()  # passa in modalità eval
@@ -257,7 +298,8 @@ def train(epochs: int, model: FewShotClassifier, train_loader: DataLoader, val_l
     progress = tqdm(range(epochs), total=epochs, leave=False, desc='COMPLETED EPOCHS')
     for epoch in progress:
         # alleno la rete su tutti gli esempi del train set (1 epoca)
-        epoch_mean_loss = train_one_epoch(model, train_loader, optimizer, criterion, device, method, n_way)
+        # epoch_mean_loss = train_one_epoch(model, train_loader, optimizer, criterion, device, method, n_way)
+        epoch_mean_loss = fast_train_one_epoch(model, train_loader, optimizer, criterion, device, method, n_way)
         writer.add_scalar(f'Loss/Train', epoch_mean_loss, epoch + 1)
         # valido il modello attuale sul validation set e ottengo l'accuratezza attuale
         acc_now = validate(model, val_loader, device)
