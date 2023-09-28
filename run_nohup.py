@@ -5,8 +5,8 @@ import json
 
 
 def run_nohup(args):
-    comb = {'fsl': {'method': ['proto', 'match', 'rel'], 'backbone': ['resnet', 'resnet18']},
-            'instance_level': {'method': ['moe', 'naive'], 'backbone': ['resnet', 'resnet18', 'resnet10', 'resnet12']},
+    comb = {'fsl': {'method': ['proto', 'match', 'rel'], 'backbone': ['resnet', 'resnet18', 'resnet10', 'resnet12']},
+            'instance_level': {'method': ['moe', 'naive'], 'backbone': ['resnet', 'resnet18']},
             'classifier': {'method': [], 'backbone': ['resnet', 'resnet18', 'cnn']}}
 
     assert args.script in comb, f'Gli script runnabili sono {[i for i in comb]}.'
