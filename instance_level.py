@@ -339,8 +339,7 @@ class MoE(nn.Module):
 class Classifier:
     """Classificatore per le 50 classi in esame"""
 
-    def __init__(self, backbone: str, method: str, device: str, ckpt_dir: Path, mapping: dict, weights: Path,
-                 pretrained: bool, head: str):
+    def __init__(self, backbone: str, method: str, device: str, ckpt_dir: Path, mapping: dict, weights: Path, pretrained: bool):
         """
 
         :param method:      una tra 'resnet' e resnet18'.
@@ -350,7 +349,6 @@ class Classifier:
         :param mapping:     mapping delle classi.
         :param weights:     percorso dei pesi da caricare.
         :param pretrained:  se usare o meno il modello preallenato come backbone di MoE.
-        :param head:                per decidere se usare una head classica o un residual block.
         """
         self.backbone = backbone
         self.method = method
@@ -358,7 +356,6 @@ class Classifier:
         self.ckpt_dir = ckpt_dir
         self.model = None
         self.pretrained = pretrained
-        self.head = head
         if self.method == 'naive':
             self.num_classes = len(mapping)
             if self.backbone == 'resnet':
@@ -388,7 +385,7 @@ class Classifier:
             self.len_item_classes = [len(mapping[key]) - 1 for key in mapping]
             # carico il modello pretrainato di resnet50 su imagenet
             self.model = MoE(self.backbone, self.num_super_classes, self.len_item_classes,
-                             self.pretrained, weights, self.device, self.head)
+                             self.pretrained, weights, self.device)
             # stampa a schermo la rete
             # summary(self.model, input_size=(1, 3, 224, 224), super_class=1)
 
@@ -897,7 +894,6 @@ def main(args):
     CHECKPOINT_DIR = Path(args.checkpoint_dir)
     NOHUP = args.nohup
     METHOD = args.method
-    HEAD = args.head
     WEIGHTS = Path(args.weights)
     PRETRAINED = args.pretrained
     SEED = args.seed
@@ -913,8 +909,6 @@ def main(args):
     assert METHOD in ['naive', 'moe'], 'scegliere --head "naive" se si vuole semplicemente avere tanti output neurons' \
                                        ' quanti sono gli oggetti oppure "moe" per usare un ensemble di classificatori' \
                                        ' specifici ciascuno per ogni categoria merceologica.'
-    assert METHOD in ['mlp', 'resblock'], 'scegliere se usare un mlp o un blocco residuale come testa di ' \
-                                          'classificazione scegliendo "mlp" o "resblock".'
 
     train_transforms = Compose([ToTensor(),
                                 RandomAffine(45, translate=(0.1, 0.1), scale=(0.8, 1.2), fill=255),
@@ -965,7 +959,7 @@ def main(args):
             train_ds = Concat(train_datasets)
             train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
 
-            cls = Classifier(BACKBONE, METHOD, DEVICE, actual_dir, class_mapping, WEIGHTS, PRETRAINED, HEAD)
+            cls = Classifier(BACKBONE, METHOD, DEVICE, actual_dir, class_mapping, WEIGHTS, PRETRAINED)
             train_result = cls.train(train_loader, val_loader, i, EPOCHS, LR)      # alleno
             best_results.append(train_result)
 
@@ -995,7 +989,7 @@ def main(args):
         class_mapping = test_ds.mapping
         test_loader = DataLoader(test_ds, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS)
 
-        cls = Classifier(BACKBONE, METHOD, DEVICE, actual_dir, class_mapping, WEIGHTS, pretrained=False, head=HEAD)  # inizializzo il classificatore
+        cls = Classifier(METHOD, DEVICE, actual_dir, class_mapping, WEIGHTS, pretrained=False)  # inizializzo il classificatore
         cls.load(WEIGHTS)
 
         if METHOD == 'naive':
