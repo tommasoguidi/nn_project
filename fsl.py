@@ -441,8 +441,6 @@ if __name__ == '__main__':
     parser.add_argument('--method', type=str, default='moe',
                         help='Scegliere se usare un approccio "naive" o "moe" se siamo in "instance_level", '
                              '"proto", "match" o "rel" se siamo in fsl. (I, F)')
-    parser.add_argument('--head', type=str, default='mlp',
-                        help='Scegliere se usare una testa stile "mlp" o un blocco residuale ("resblock"). (I)')
     parser.add_argument('--pretrained', type=bool, default=False,
                         help='Per decidere se allenare anche la resnet o semplicemente caricare i pesi. (I)')
     parser.add_argument('--episodes', type=int, default=500, help='Numero di episodi per ogni epoca. (F)')

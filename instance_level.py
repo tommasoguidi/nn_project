@@ -180,47 +180,17 @@ class Concat(Dataset):
 
 class Head(nn.Module):
     """Questa è la classe base delle classification heads usate nel caso 'moe'."""
-    def __init__(self, in_channels: int, classes: int):
+    def __init__(self, in_features: int, classes: int):
         super().__init__()
-        self.layer1 = nn.Linear(in_channels, 4096)
+        self.layer1 = nn.Linear(in_features, 4096)
         self.layer2 = nn.Linear(4096, 2048)
         self.layer3 = nn.Linear(2048, classes)
 
     def forward(self, x):
-        x = F.adaptive_avg_pool2d(x, (1, 1))
-        x = torch.flatten(x, 1)     # ottengo il feature vector dalla feature map
         x = F.relu(self.layer1(x))
         x = F.relu(self.layer2(x))
         x = F.dropout(x)
         logits = self.layer3(x)  # output della rete prima di applicare softmax
-
-        return logits
-
-
-class ResBlock(nn.Module):
-    """classification head usando un blocco base di resnet"""
-    def __init__(self, in_channels, num_classes):
-        super().__init__()
-        self.conv1 = nn.Conv2d(in_channels, 2 * in_channels, kernel_size=3, padding=1, bias=False)
-        self.bn1 = nn.BatchNorm2d(2 * in_channels)
-        self.relu = nn.ReLU(inplace=True)
-        self.conv2 = nn.Conv2d(2 * in_channels, 2 * in_channels, kernel_size=3, padding=1, bias=False)
-        self.bn2 = nn.BatchNorm2d(2 * in_channels)
-        self.fc = nn.Linear(2 * in_channels, num_classes)
-
-    def forward(self, x):
-        identity = x
-        out = self.conv1(x)
-        out = self.bn1(out)
-        out = self.relu(out)
-        out = self.conv2(out)
-        out = self.bn2(out)
-        out += identity
-        out = self.relu(out)
-        out = F.adaptive_avg_pool2d(out, (1, 1))
-        out = torch.flatten(out, 1)  # ottengo il feature vector dalla feature map
-        logits = self.fc(out)  # output della rete prima di applicare softmax
-
         return logits
 
 
@@ -274,13 +244,13 @@ class MyResNet(nn.Module):
         x = self.resnet.layer1(x)
         x = self.resnet.layer2(x)
         x = self.resnet.layer3(x)
-        feature_map = self.resnet.layer4(x)
+        x = self.resnet.layer4(x)
 
-        x = self.resnet.avgpool(feature_map)
-        x = torch.flatten(x, 1)
-        x = self.resnet.fc(x)
+        x = self.resnet.avgpool(x)
+        feature_vector = torch.flatten(x, 1)
+        x = self.resnet.fc(feature_vector)
 
-        return x, feature_map
+        return x, feature_vector
 
 
 class MoE(nn.Module):
@@ -289,7 +259,7 @@ class MoE(nn.Module):
     classe.
     """
     def __init__(self, backbone: str, num_super_classes: int, len_item_classes: list,
-                 pretrained: bool, weights: Path, device: str, head: str):
+                 pretrained: bool, weights: Path, device: str):
         """
 
         :param num_super_classes:   'resnet' o 'resnet18'.
@@ -299,7 +269,6 @@ class MoE(nn.Module):
         :param pretrained:          se caricare il modello preallentato di resnet.
         :param weights:             percorso dei pesi da caricare.
         :param device:              cpu o gpu.
-        :param head:                per decidere se usare una head classica o un residual block.
         """
         super().__init__()
         self.num_super_classes = num_super_classes
@@ -310,27 +279,21 @@ class MoE(nn.Module):
         # la i-esima istanza ha come in_features la dimensione delle feature uscenti dalla resnet dopo flatten() (2048)
         # e come classes il numero dei prodotti appartenenti alla i-esima super class
         if backbone == 'resnet':
-            in_channels = 2048
+            self.heads = nn.ModuleList([Head(2048, self.len_item_classes[i]) for i in range(self.num_super_classes)])
         elif backbone == 'resnet18':
-            in_channels = 512
-        if head == 'mlp':
-            self.heads = nn.ModuleList([Head(in_channels, self.len_item_classes[i])
-                                        for i in range(self.num_super_classes)])
-        elif head == 'resblock':
-            self.heads = nn.ModuleList([ResBlock(in_channels, self.len_item_classes[i])
-                                        for i in range(self.num_super_classes)])
+            self.heads = nn.ModuleList([Head(512, self.len_item_classes[i]) for i in range(self.num_super_classes)])
 
     def forward(self, x, super_class):
         # il metodo forward() di resnet è stato modificato per ritornare anche il feature vector
         # il forward di moe avviene su un singolo evento e non su un batch
-        super_class_logits, feature_map = self.resnet.forward(x)
+        super_class_logits, feature_vector = self.resnet.forward(x)
         super_class_output = F.softmax(super_class_logits, dim=1)  # class probability
         super_class_decision = torch.argmax(super_class_output)
         # la indirizzo alla testa scelta da decision
         if super_class is not None:
-            item_logits = self.heads[super_class.item()].forward(feature_map)
+            item_logits = self.heads[super_class.item()].forward(feature_vector)
         else:
-            item_logits = self.heads[super_class_decision.item()].forward(feature_map)     # caso eval
+            item_logits = self.heads[super_class_decision.item()].forward(feature_vector)     # caso eval
         item_output = F.softmax(item_logits, dim=1)  # class probability
 
         return super_class_logits, super_class_output, item_logits, item_output
@@ -862,7 +825,7 @@ class Classifier:
                 # valido il modello attuale sul validation set e ottengo l'accuratezza attuale
                 class_acc_now, item_acc_now = self.validate_moe(val_loader, epoch, criterion, writer)
                 # scelgo il modello migliore e lo salvo
-                if class_acc_now >= best_class_acc and item_acc_now > best_item_acc:
+                if class_acc_now > best_class_acc and item_acc_now > best_item_acc:
                     best_class_acc = class_acc_now
                     best_item_acc = item_acc_now
                     best_epoch = epoch + 1
@@ -1024,8 +987,6 @@ if __name__ == '__main__':
     parser.add_argument('--method', type=str, default='moe',
                         help='Scegliere se usare un approccio "naive" o "moe" se siamo in "instance_level", '
                              '"proto", "match" o "rel" se siamo in fsl. (I, F)')
-    parser.add_argument('--head', type=str, default='mlp',
-                        help='Scegliere se usare una testa stile "mlp" o un blocco residuale ("resblock"). (I)')
     parser.add_argument('--pretrained', type=bool, default=False,
                         help='Ha senso solo durante il train se vogliamo allenare solo le teste ed utilizzare un '
                              'modello già allenato per fare la classificazione iniziale. (I)')
