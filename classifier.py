@@ -221,6 +221,7 @@ class Classifier:
         :param weights:     percorso dei pesi da caricare.
         :return:
         """
+        print(weights)
         model_state = torch.load(weights, map_location=self.device)
         self.model.load_state_dict(model_state["model"])
         self.model.to(self.device)
