@@ -521,18 +521,27 @@ def main(args):
     else:
         # a questo giro deve essere il percorso completo alla cartella in cui sono stati salvati i progressi
         # del modello prescelto
-        actual_dir = CHECKPOINT_DIR
+        experiment_dir = CHECKPOINT_DIR
         # per creare il dataset passo il parametro split ma non serve (__init__ lo setta a n_folds)
         test_ds = MyDataset(ROOT, N_FOLDS, split=0, mode=MODE, transforms=val_transforms, seed=SEED)
         class_mapping = test_ds.mapping
         test_loader = DataLoader(test_ds, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS)
 
-        cls = Classifier(BACKBONE, DEVICE, actual_dir, class_mapping)  # inizializzo il classificatore
-        cls.load(WEIGHTS)
-
-        test_accuracy, top3_accuracy = cls.test(test_loader)
-        print(f'Accuracy sui dati di test: {test_accuracy}%.')
-        print(f'Top3-Accuracy sui dati di test: {top3_accuracy}%.')
+        cls = Classifier(BACKBONE, DEVICE, experiment_dir, class_mapping)  # inizializzo il classificatore
+        test_acc, test_top3 = [], []
+        for i in range(N_FOLDS):
+            actual_dir = experiment_dir / f'fold_{i}'
+            files = [str(i) for i in actual_dir.glob('*')]
+            for file in files:
+                if 'deepmammo' in file:
+                    cls.load(file)
+                    fold_acc, fold_top3 = cls.test(test_loader)
+                    test_acc.append(fold_acc)
+                    test_top3.append(fold_top3)
+                    print(f'Accuracy sui dati di test durante il fold {i + 1}: {fold_acc}%.')
+                    print(f'Top3-Accuracy sui dati di test durante il fold {i + 1}: {fold_top3}%.')
+        print(f'Accuracy media: {np.mean(test_acc)}%.')
+        print(f'Top3-Accuracy media: {np.mean(test_top3)}%.')
 
 
 if __name__ == '__main__':
@@ -569,7 +578,8 @@ if __name__ == '__main__':
     parser.add_argument('--n-query', type=int, default=4, help='Numero di esempi per ogni classe nel query set. (F)')
     # -----------QUESTI-VENGONO-PASSATI-SOLO-DA-NOHUP-E-NON-VANNO-USATI-------------------------------------------------
     parser.add_argument('--checkpoint-dir', type=str, default='runs/classifier',
-                        help='Cartella dove salvare i risultati dei vari esperimenti. (C, I, F)')
+                        help='Cartella dove salvare i risultati dei vari esperimenti. Se stiamo facendo il test, '
+                             'indicare il percorso dell\'esperimento per testare tutti i fold. (C, I, F)')
     parser.add_argument('--nohup', type=bool, default=False, help='Se lancio da nohup passo true. (C, I, F)')
 
     arguments = parser.parse_args()
