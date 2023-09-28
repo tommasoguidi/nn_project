@@ -181,9 +181,12 @@ def train_one_epoch(model: FewShotClassifier, dataloader: DataLoader, optimizer:
     n_episodes = len(dataloader)
     progress = tqdm(dataloader, total=n_episodes, leave=False, desc='COMPLETED EPISODES')
     epoch_loss = 0.0  # inizializzo la loss
+    tot_cases = 0  # counter dei casi totali (sarebbe la len(dataset_val))
     for sample in progress:
         support_images, support_labels, query_images, query_labels, _ = sample
         support_images, support_labels = support_images.to(device), support_labels.to(device)
+        episode_cases = query_labels.shape[0]
+        tot_cases += episode_cases  # accumulo il numero totale di sample
         # output della rete
         model.process_support_set(support_images, support_labels)
         query_images = query_images.to(device)
@@ -201,7 +204,7 @@ def train_one_epoch(model: FewShotClassifier, dataloader: DataLoader, optimizer:
         postfix = {'batch_mean_loss': episode_loss.item() / query_labels.shape[0]}
         progress.set_postfix(postfix)
 
-    epoch_mean_loss = epoch_loss / n_episodes        # loss media sull'epoca
+    epoch_mean_loss = epoch_loss / tot_cases        # loss media sull'epoca
     return epoch_mean_loss
 
 
