@@ -212,7 +212,7 @@ class Classifier:
 
         self.model.to(self.device)
         # # stampa a schermo la rete
-        summary(self.model, input_size=(1, 3, 224, 224))
+        # summary(self.model, input_size=(1, 3, 224, 224))
 
     def load(self, weights: Path):
         """
