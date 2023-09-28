@@ -390,7 +390,7 @@ class Classifier:
             self.model = MoE(self.backbone, self.num_super_classes, self.len_item_classes,
                              self.pretrained, weights, self.device, self.head)
             # stampa a schermo la rete
-            summary(self.model, input_size=(1, 3, 224, 224), super_class=1)
+            # summary(self.model, input_size=(1, 3, 224, 224), super_class=1)
 
         self.model.to(self.device)
 
