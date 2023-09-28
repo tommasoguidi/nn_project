@@ -380,7 +380,7 @@ class Classifier:
         accuracy = (correct / tot_cases) * 100.0  # accuracy sull'epoca (%)
         top3_acc = (top3_count / tot_cases) * 100.0  # top3_accuracy sull'epoca (%)
 
-        return accuracy.item(), top3_acc.item()
+        return accuracy, top3_acc
 
     def train(self, train_loader: DataLoader, val_loader: DataLoader, split: int, epochs: int, lr: float):
         """
@@ -537,8 +537,8 @@ def main(args):
             test_top3.append(fold_top3)
             print(f'Accuracy sui dati di test durante il fold {i + 1}: {fold_acc}%.')
             print(f'Top3-Accuracy sui dati di test durante il fold {i + 1}: {fold_top3}%.')
-        print(f'Accuracy media: {np.mean(test_acc)}%.')
-        print(f'Top3-Accuracy media: {np.mean(test_top3)}%.')
+        print(f'Accuracy media: {torch.mean(torch.tensor(test_acc))}%.')
+        print(f'Top3-Accuracy media: {torch.mean(torch.tensor(test_top3))}%.')
 
 
 if __name__ == '__main__':
