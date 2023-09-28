@@ -19,28 +19,29 @@ for script in interessanti:
             dest_path = dest_dir / script / f'run_{str(run)}' / f'fold_{str(i)}'
             os.makedirs(dest_path, exist_ok=True)
             dest = dest_path / file.split('/')[-1]
-            shutil.copy(file, dest)
+            if not os.path.exists(dest):
+                shutil.copy(file, dest)
 
-            event_acc = EventAccumulator(file)
-            event_acc.Reload()
-            data = {}
+                event_acc = EventAccumulator(file)
+                event_acc.Reload()
+                data = {}
 
-            hparam_file = False  # I save hparam files as 'hparam/xyz_metric'
-            for tag in sorted(event_acc.Tags()["scalars"]):
-                if tag.split('/')[0] == 'hparam': hparam_file = True  # check if its a hparam file
-                step, value = [], []
+                hparam_file = False  # I save hparam files as 'hparam/xyz_metric'
+                for tag in sorted(event_acc.Tags()["scalars"]):
+                    if tag.split('/')[0] == 'hparam': hparam_file = True  # check if its a hparam file
+                    step, value = [], []
 
-                for scalar_event in event_acc.Scalars(tag):
-                    step.append(scalar_event.step)
-                    value.append(scalar_event.value)
+                    for scalar_event in event_acc.Scalars(tag):
+                        step.append(scalar_event.step)
+                        value.append(scalar_event.value)
 
-                data[tag] = (step, value)
+                    data[tag] = (step, value)
 
-            for i in data:
-                epochs = data[i][0]
-                values = data[i][1]
-                pic_name = i.replace('/', '_')
+                for i in data:
+                    epochs = data[i][0]
+                    values = data[i][1]
+                    pic_name = i.replace('/', '_')
 
-                plt.plot(epochs, values)
-                plt.suptitle(f'{i}')
-                plt.savefig(dest_path / f'{pic_name}.png')
+                    plt.plot(epochs, values)
+                    plt.suptitle(f'{i}')
+                    plt.savefig(dest_path / f'{pic_name}.png')
