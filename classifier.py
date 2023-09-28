@@ -535,6 +535,7 @@ def main(args):
             files = [str(i) for i in actual_dir.glob('*')]
             for file in files:
                 if 'deepmammo' in file:
+                    print(file)
                     cls.load(file)
                     fold_acc, fold_top3 = cls.test(test_loader)
                     test_acc.append(fold_acc)
