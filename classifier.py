@@ -536,6 +536,7 @@ def main(args):
             test_acc.append(fold_acc)
             test_top3.append(fold_top3)
             print(f'Accuracy sui dati di test durante il fold {i + 1}: {fold_acc}%.')
+            print(fold_acc.item())
             print(f'Top3-Accuracy sui dati di test durante il fold {i + 1}: {fold_top3}%.')
         print(f'Accuracy media: {np.mean(test_acc)}%.')
         print(f'Top3-Accuracy media: {np.mean(test_top3)}%.')
