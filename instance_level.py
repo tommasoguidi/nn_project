@@ -825,7 +825,7 @@ class Classifier:
                 # valido il modello attuale sul validation set e ottengo l'accuratezza attuale
                 class_acc_now, item_acc_now = self.validate_moe(val_loader, epoch, criterion, writer)
                 # scelgo il modello migliore e lo salvo
-                if class_acc_now > best_class_acc and item_acc_now > best_item_acc:
+                if class_acc_now >= best_class_acc and item_acc_now > best_item_acc:
                     best_class_acc = class_acc_now
                     best_item_acc = item_acc_now
                     best_epoch = epoch + 1
