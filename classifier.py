@@ -221,7 +221,6 @@ class Classifier:
         :param weights:     percorso dei pesi da caricare.
         :return:
         """
-        print(weights)
         model_state = torch.load(weights, map_location=self.device)
         self.model.load_state_dict(model_state["model"])
         self.model.to(self.device)
@@ -531,17 +530,13 @@ def main(args):
         cls = Classifier(BACKBONE, DEVICE, experiment_dir, class_mapping)  # inizializzo il classificatore
         test_acc, test_top3 = [], []
         for i in range(N_FOLDS):
-            actual_dir = experiment_dir / f'fold_{i}'
-            files = [str(i) for i in actual_dir.glob('*')]
-            for file in files:
-                if 'deepmammo' in file:
-                    print(file)
-                    cls.load(file)
-                    fold_acc, fold_top3 = cls.test(test_loader)
-                    test_acc.append(fold_acc)
-                    test_top3.append(fold_top3)
-                    print(f'Accuracy sui dati di test durante il fold {i + 1}: {fold_acc}%.')
-                    print(f'Top3-Accuracy sui dati di test durante il fold {i + 1}: {fold_top3}%.')
+            weights = experiment_dir / f'fold_{i}' / 'classifier.pth'
+            cls.load(weights)
+            fold_acc, fold_top3 = cls.test(test_loader)
+            test_acc.append(fold_acc)
+            test_top3.append(fold_top3)
+            print(f'Accuracy sui dati di test durante il fold {i + 1}: {fold_acc}%.')
+            print(f'Top3-Accuracy sui dati di test durante il fold {i + 1}: {fold_top3}%.')
         print(f'Accuracy media: {np.mean(test_acc)}%.')
         print(f'Top3-Accuracy media: {np.mean(test_top3)}%.')
 
