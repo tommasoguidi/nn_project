@@ -913,8 +913,8 @@ def main(args):
     assert METHOD in ['naive', 'moe'], 'scegliere --head "naive" se si vuole semplicemente avere tanti output neurons' \
                                        ' quanti sono gli oggetti oppure "moe" per usare un ensemble di classificatori' \
                                        ' specifici ciascuno per ogni categoria merceologica.'
-    assert HEAD in ['mlp', 'resblock'], 'scegliere se usare un mlp o un blocco residuale come testa di ' \
-                                        'classificazione scegliendo "mlp" o "resblock".'
+    assert METHOD in ['mlp', 'resblock'], 'scegliere se usare un mlp o un blocco residuale come testa di ' \
+                                          'classificazione scegliendo "mlp" o "resblock".'
 
     train_transforms = Compose([ToTensor(),
                                 RandomAffine(45, translate=(0.1, 0.1), scale=(0.8, 1.2), fill=255),
