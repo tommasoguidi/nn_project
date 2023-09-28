@@ -21,7 +21,7 @@ from easyfsl.datasets import FewShotDataset
 from easyfsl.methods import FewShotClassifier
 from easyfsl.samplers import TaskSampler
 from easyfsl.methods import PrototypicalNetworks, MatchingNetworks, RelationNetworks
-from easyfsl.modules import resnet18, resnet50
+from easyfsl.modules import resnet18, resnet10, resnet12, resnet50
 
 
 class MyDataset(FewShotDataset):
@@ -235,8 +235,8 @@ def validate(model: FewShotClassifier, val_loader: DataLoader, device: torch.dev
 
 
 def train(epochs: int, model: FewShotClassifier, train_loader: DataLoader, val_loader: DataLoader,
-          optimizer: torch.optim.Optimizer, criterion: nn.Module, device: torch.device, ckpt_dir: Path,
-          method: str, n_way: int):
+          optimizer: torch.optim.Optimizer, scheduler: torch.optim.lr_scheduler, criterion: nn.Module,
+          device: torch.device, ckpt_dir: Path, method: str, n_way: int):
     """
 
     :param epochs:          numero di epoche.
@@ -244,6 +244,7 @@ def train(epochs: int, model: FewShotClassifier, train_loader: DataLoader, val_l
     :param train_loader:    dataloader del dataset di train (serve solo a train__one_epoch).
     :param val_loader:      dataloader del dataset di validation (serve solo a evaluate).
     :param optimizer:       per aggiornare i parametri (serve solo a train__one_epoch).
+    :param scheduler:       per variare il learning rate durante il training.
     :param criterion:       par calcolare la loss (serve solo a train__one_epoch).
     :param device:          cuda o cpu.
     :param ckpt_dir:        la directory dove stiamo salvando il modello.
@@ -261,6 +262,7 @@ def train(epochs: int, model: FewShotClassifier, train_loader: DataLoader, val_l
         # valido il modello attuale sul validation set e ottengo l'accuratezza attuale
         acc_now = validate(model, val_loader, device)
         writer.add_scalar(f'Accuracy/Val', acc_now, epoch + 1)
+        scheduler.step()
         # scelgo il modello migliore e lo salvo
         if acc_now > best_acc:
             best_acc = acc_now
@@ -301,13 +303,16 @@ def main(args):
 
     assert MODE in ['train', 'eval'], '--mode deve essere uno tra "train" e "eval".'
     assert DEVICE in ['cuda', 'cpu'], '--device deve essere uno tra "cuda" e "cpu".'
-    assert BACKBONE in ['resnet', 'resnet18'], 'le --backbone disponibili sono: "resnet" (50) e "resnet18".'
+    assert BACKBONE in ['resnet', 'resnet18', 'resnet10', 'resnet12'],\
+        'le --backbone disponibili sono: "resnet" (50), "resnet18", "resnet10" e "resnet12".'
     assert METHOD in ['proto', 'match', 'rel'], 'i metodi di few-shot learning utilizzabili sono prototypical ' \
                                                 'network ("proto"), matching network ("match") o relation network ' \
                                                 '("rel").'
 
     backbones = {'resnet': {'arch': resnet50(), 'f_dim': 2048},
-                 'resnet18': {'arch': resnet18(), 'f_dim': 512}}
+                 'resnet18': {'arch': resnet18(), 'f_dim': 512},
+                 'resnet10': {'arch': resnet10(), 'f_dim': 512},
+                 'resnet12': {'arch': resnet12(), 'f_dim': 640}}
     bb = backbones[BACKBONE]['arch']
     f_dim = backbones[BACKBONE]['f_dim']
 
@@ -381,10 +386,13 @@ def main(args):
             # adesso ho il classificatore e la loss function, mi manca da definire l'optimizer e il summary per il log
             # dei dati del train
             optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, classifier.parameters()), LR)
+
+            optimizer = torch.optim.SGD(classifier.parameters(), lr=LR, momentum=0.9, weight_decay=5e-4)
+            scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[120, 160], gamma=0.1)
             ckpt_dir = actual_dir / f'fold_{i}'
 
-            best_metrics = train(EPOCHS, classifier, train_loader, val_loader, optimizer, criterion, DEVICE, ckpt_dir,
-                                 METHOD, N_WAY)
+            best_metrics = train(EPOCHS, classifier, train_loader, val_loader, optimizer, scheduler, criterion,
+                                 DEVICE, ckpt_dir, METHOD, N_WAY)
             best_results.append(best_metrics)
 
         for i, r in enumerate(best_results):
@@ -429,8 +437,8 @@ if __name__ == '__main__':
     parser.add_argument('--device', type=str, default='cuda',
                         help='Scegliere se usare la gpu ("cuda") o la "cpu". (C, I, F)')
     parser.add_argument('-b', '--backbone', type=str, default='resnet',
-                        help='Scegliere se utilizzare una semplice "cnn", "resnet" (50) o "resnet18" '
-                             'come features extractor. (C, I, F)')
+                        help='Scegliere se utilizzare una semplice "cnn", "resnet" (50), "resnet18", "resnet10" '
+                             'o "resnet12" come features extractor. (C, I, F)')
     parser.add_argument('-e', '--epochs', type=int, default=25, help='Epoche per eseguire il train. (C, I, F)')
     parser.add_argument('--batch-size', type=int, default=16, help='Numero di esempi in ogni batch. (C, I)')
     parser.add_argument('--num-workers', type=int, default=3, help='Numero di worker. (C, I, F)')

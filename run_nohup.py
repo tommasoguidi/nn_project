@@ -6,7 +6,7 @@ import json
 
 def run_nohup(args):
     comb = {'fsl': {'method': ['proto', 'match', 'rel'], 'backbone': ['resnet', 'resnet18']},
-            'instance_level': {'method': ['moe', 'naive'], 'backbone': ['resnet', 'resnet18']},
+            'instance_level': {'method': ['moe', 'naive'], 'backbone': ['resnet', 'resnet18', 'resnet10', 'resnet12']},
             'classifier': {'method': [], 'backbone': ['resnet', 'resnet18', 'cnn']}}
 
     assert args.script in comb, f'Gli script runnabili sono {[i for i in comb]}.'
@@ -55,8 +55,8 @@ if __name__ == '__main__':
     parser.add_argument('--device', type=str, default='cuda',
                         help='Scegliere se usare la gpu ("cuda") o la "cpu". (C, I, F)')
     parser.add_argument('-b', '--backbone', type=str, default='resnet',
-                        help='Scegliere se utilizzare una semplice "cnn", "resnet" (50) o "resnet18" '
-                             'come features extractor. (C, I, F)')
+                        help='Scegliere se utilizzare una semplice "cnn", "resnet" (50), "resnet18", "resnet10" '
+                             'o "resnet12" come features extractor. (C, I, F)')
     parser.add_argument('-e', '--epochs', type=int, default=25, help='Epoche per eseguire il train. (C, I, F)')
     parser.add_argument('--batch-size', type=int, default=16, help='Numero di esempi in ogni batch. (C, I)')
     parser.add_argument('--num-workers', type=int, default=3, help='Numero di worker. (C, I, F)')
