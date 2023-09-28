@@ -262,7 +262,8 @@ def train(epochs: int, model: FewShotClassifier, train_loader: DataLoader, val_l
         # valido il modello attuale sul validation set e ottengo l'accuratezza attuale
         acc_now = validate(model, val_loader, device)
         writer.add_scalar(f'Accuracy/Val', acc_now, epoch + 1)
-        scheduler.step()
+        if scheduler:
+            scheduler.step()
         # scelgo il modello migliore e lo salvo
         if acc_now > best_acc:
             best_acc = acc_now
@@ -385,10 +386,12 @@ def main(args):
 
             # adesso ho il classificatore e la loss function, mi manca da definire l'optimizer e il summary per il log
             # dei dati del train
-            optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, classifier.parameters()), LR)
+            optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, classifier.parameters()), LR,
+                                         eps=1e-6, weight_decay=5e-4)
+            scheduler = None
 
-            optimizer = torch.optim.SGD(classifier.parameters(), lr=LR, momentum=0.9, weight_decay=5e-4)
-            scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[120, 160], gamma=0.1)
+            # optimizer = torch.optim.SGD(classifier.parameters(), lr=LR, momentum=0.9, weight_decay=5e-4)
+            # scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[120, 160], gamma=0.1)
             ckpt_dir = actual_dir / f'fold_{i}'
 
             best_metrics = train(EPOCHS, classifier, train_loader, val_loader, optimizer, scheduler, criterion,
