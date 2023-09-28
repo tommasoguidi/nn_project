@@ -204,9 +204,9 @@ class ResBlock(nn.Module):
         self.conv1 = nn.Conv2d(in_channels, 2 * in_channels, kernel_size=3, padding=1, bias=False)
         self.bn1 = nn.BatchNorm2d(2 * in_channels)
         self.relu = nn.ReLU(inplace=True)
-        self.conv2 = nn.Conv2d(2 * in_channels, 2 * in_channels, kernel_size=3, padding=1, bias=False)
-        self.bn2 = nn.BatchNorm2d(2 * in_channels)
-        self.fc = nn.Linear(2 * in_channels, num_classes)
+        self.conv2 = nn.Conv2d(2 * in_channels, in_channels, kernel_size=3, padding=1, bias=False)
+        self.bn2 = nn.BatchNorm2d(in_channels)
+        self.fc = nn.Linear(in_channels, num_classes)
 
     def forward(self, x):
         identity = x
