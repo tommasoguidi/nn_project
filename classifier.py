@@ -519,8 +519,7 @@ def main(args):
         print(f'Accuracy media: {mean_accuracy}%.')
 
     else:
-        # a questo giro deve essere il percorso completo alla cartella in cui sono stati salvati i progressi
-        # del modello prescelto
+        # a questo giro deve essere il percorso alla cartella dell'esperimento
         experiment_dir = CHECKPOINT_DIR
         # per creare il dataset passo il parametro split ma non serve (__init__ lo setta a n_folds)
         test_ds = MyDataset(ROOT, N_FOLDS, split=0, mode=MODE, transforms=val_transforms, seed=SEED)

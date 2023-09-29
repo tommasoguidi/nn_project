@@ -944,24 +944,33 @@ def main(args):
             print(f'Item accuracy media: {mean_item_accuracy}%.')
 
     else:
-        # a questo giro deve essere il percorso completo alla cartella in cui sono stati salvati i progressi
-        # del modello prescelto
-        actual_dir = CHECKPOINT_DIR
-        # per creare il dataset non passo il parametro split perchè non serve (__init__ lo setta a n_folds)
+        # a questo giro deve essere il percorso alla cartella dell'esperimento
+        experiment_dir = CHECKPOINT_DIR
+        # per creare il dataset passo il parametro split ma non serve (__init__ lo setta a n_folds)
         test_ds = MyDataset(ROOT, N_FOLDS, split=0, mode=MODE, transforms=val_transforms, method=METHOD, seed=SEED)
         class_mapping = test_ds.mapping
         test_loader = DataLoader(test_ds, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS)
 
-        cls = Classifier(METHOD, DEVICE, actual_dir, class_mapping, WEIGHTS, pretrained=False)  # inizializzo il classificatore
-        cls.load(WEIGHTS)
-
+        cls = Classifier(BACKBONE, METHOD, DEVICE, experiment_dir, class_mapping, WEIGHTS, pretrained=False)  # inizializzo il classificatore
+        naive_acc, moe_class_acc, moe_item_acc = [], [], []
+        for i in range(N_FOLDS):
+            weights = experiment_dir / f'fold_{i}' / 'classifier.pth'
+            cls.load(weights)
+            if METHOD == 'naive':
+                test_accuracy = cls.test_naive(test_loader)
+                naive_acc.append(test_accuracy)
+                print(f'Accuracy sui dati di test durante il fold {i + 1}: {test_accuracy}%.')
+            else:
+                class_accuracy, item_accuracy = cls.test_moe(test_loader)
+                moe_class_acc.append(class_accuracy)
+                moe_item_acc.append(item_accuracy)
+                print(f'Class accuracy sui dati di test durante il fold {i + 1}: {class_accuracy}%.')
+                print(f'Item accuracy sui dati di test durante il fold {i + 1}: {item_accuracy}%.')
         if METHOD == 'naive':
-            test_accuracy = cls.test_naive(test_loader)
-            print(f'Accuracy sui dati di test: {test_accuracy}%.')
+            print(f'Naive accuracy media: {torch.mean(torch.tensor(naive_acc))}%.')
         else:
-            class_accuracy, item_accuracy = cls.test_moe(test_loader)
-            print(f'Class accuracy sui dati di test: {class_accuracy}%.')
-            print(f'Item accuracy sui dati di test: {item_accuracy}%.')
+            print(f'Class cccuracy media: {torch.mean(torch.tensor(class_accuracy))}%.')
+            print(f'Item accuracy media: {torch.mean(torch.tensor(item_accuracy))}%.')
 
 
 if __name__ == '__main__':
