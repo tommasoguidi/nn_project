@@ -47,3 +47,4 @@ for script in tqdm(interessanti, total=3, leave=False, desc='SALVANDO LE LOG PIU
                     plt.plot(epochs, values)
                     plt.suptitle(f'{j}')
                     fig.savefig(dest_path / f'{pic_name}.png')
+                    plt.close(fig)
