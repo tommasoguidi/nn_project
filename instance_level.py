@@ -324,7 +324,8 @@ class Classifier:
             if self.backbone == 'resnet':
                 # carico il modello di resnet50 senza pretrain perchè alleno solo il layer finale
                 self.model = resnet50(num_classes=10)
-                self.load(weights)
+                if self.pretrained:
+                    self.load(weights)
                 # # congelo i parametri per allenare solo il layer finale
                 for p in self.model.parameters():
                     p.requires_grad = False
