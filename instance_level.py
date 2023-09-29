@@ -515,6 +515,10 @@ class Classifier:
 
         accuracy = (correct / tot_cases) * 100.0  # accuracy sull'epoca (%)
 
+        # debug
+        print(f'ground truth: {labels}')
+        print(f'decisions: {batch_decisions}')
+
         return accuracy
 
     def train_moe_one_epoch(self, dataloader, epoch, optimizer, criterion, writer):
@@ -768,6 +772,12 @@ class Classifier:
 
         class_accuracy = (class_correct / tot_cases) * 100.0  # accuracy sull'epoca (%)
         item_accuracy = (item_correct / tot_cases) * 100.0  # accuracy sull'epoca (%)
+
+        # debug
+        print(f'class ground truth: {super_class_labels}')
+        print(f'class decisions: {class_decisions}')
+        print(f'item ground truth: {item_labels}')
+        print(f'item decisions: {item_decisions}')
 
         return class_accuracy, item_accuracy
 
