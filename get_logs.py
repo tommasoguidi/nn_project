@@ -43,6 +43,7 @@ for script in tqdm(interessanti, total=3, leave=False, desc='SALVANDO LE LOG PIU
                     values = data[j][1]
                     pic_name = j.replace('/', '_')
 
+                    fig = plt.figure()
                     plt.plot(epochs, values)
                     plt.suptitle(f'{j}')
-                    plt.savefig(dest_path / f'{pic_name}.png')
+                    fig.savefig(dest_path / f'{pic_name}.png')
