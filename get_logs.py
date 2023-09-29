@@ -3,6 +3,7 @@ import shutil
 import os
 from tensorboard.backend.event_processing.event_accumulator import EventAccumulator
 import matplotlib.pyplot as plt
+from tqdm import tqdm
 
 
 src_dir = Path('runs')
@@ -11,8 +12,8 @@ interessanti = {'classifier': [7, 23],
                 'instance_level': [3, 5, 9, 10, 28, 29, 31, 34, 36, 37],
                 'fsl': [5, 20, 25, 27, 38, 46, 50, 51]}
 
-for script in interessanti:
-    for run in interessanti[script]:
+for script in tqdm(interessanti, total=3, leave=False, desc='SALVANDO LE LOG PIU INTERESSANTI...'):
+    for run in tqdm(interessanti[script], leave=False, desc=f'...TRA QUELLE DI {script}'):
         for i in range(3):
             src_path = src_dir / script / f'run_{str(run)}' / f'fold_{str(i)}'
             file = str(src_path.glob('*deepmammo*').__next__())
@@ -37,11 +38,11 @@ for script in interessanti:
 
                     data[tag] = (step, value)
 
-                for i in data:
-                    epochs = data[i][0]
-                    values = data[i][1]
-                    pic_name = i.replace('/', '_')
+                for j in data:
+                    epochs = data[j][0]
+                    values = data[j][1]
+                    pic_name = j.replace('/', '_')
 
                     plt.plot(epochs, values)
-                    plt.suptitle(f'{i}')
+                    plt.suptitle(f'{j}')
                     plt.savefig(dest_path / f'{pic_name}.png')
