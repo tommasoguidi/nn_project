@@ -8,7 +8,7 @@ from tqdm import tqdm
 
 src_dir = Path('runs')
 dest_dir = Path('nice_logs')
-interessanti = {'classifier': [7, 23],
+interessanti = {'classifier': [5, 7, 23],
                 'instance_level': [3, 5, 9, 10, 28, 29, 31, 34, 36, 37],
                 'fsl': [5, 20, 25, 27, 38, 46, 50, 51]}
 
