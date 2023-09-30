@@ -105,7 +105,7 @@ class MyDataset(Dataset):
         else:
             item_label = torch.tensor(self.mapping[super_class_label][item_label], dtype=torch.long)
             super_class_label = torch.tensor(self.mapping[super_class_label]['identifier'], dtype=torch.long)
-            return image, super_class_label, item_label, image_path
+            return image, super_class_label, item_label, str(image_path)
 
     def _get_ids_in_split(self):
         """
