@@ -105,7 +105,7 @@ class MyDataset(Dataset):
         else:
             item_label = torch.tensor(self.mapping[super_class_label][item_label], dtype=torch.long)
             super_class_label = torch.tensor(self.mapping[super_class_label]['identifier'], dtype=torch.long)
-            return image, super_class_label, item_label
+            return image, super_class_label, item_label, image_path
 
     def _get_ids_in_split(self):
         """
@@ -556,7 +556,7 @@ class Classifier:
             batch_class_loss = 0.0
             batch_item_loss = 0.0
 
-            images, super_class_labels, item_labels = sample
+            images, super_class_labels, item_labels, _ = sample
             batch_cases = images.shape[0]  # numero di sample nel batch
             tot_cases += batch_cases  # accumulo il numero totale di esempi
             # adesso il problema è che per ogni esempio l'architettura della rete cambia, quindi per aggiornare i
@@ -669,7 +669,7 @@ class Classifier:
             batch_class_loss = 0.0
             batch_item_loss = 0.0
 
-            images, super_class_labels, item_labels = sample
+            images, super_class_labels, item_labels, _ = sample
             batch_cases = images.shape[0]  # numero di sample nel batch
             tot_cases += batch_cases  # accumulo il numero totale di esempi
             # adesso il problema è che per ogni esempio l'architettura della rete cambia, quindi per aggiornare i
@@ -742,11 +742,12 @@ class Classifier:
         class_correct = 0  # prediction corrette della rete per calcolare l'accuracy sulle superclassi
         item_correct = 0  # segno le prediction corrette della rete per poi calcolare l'accuracy sui prodotti
         tot_cases = 0  # counter dei casi totali (sarebbe la len(dataset_train))
+        inference = []
         for sample in progress:
             class_decisions = []
             item_decisions = []
 
-            images, super_class_labels, item_labels = sample
+            images, super_class_labels, item_labels, image_paths = sample
             batch_cases = images.shape[0]  # numero di sample nel batch
             tot_cases += batch_cases  # accumulo il numero totale di esempi
             # adesso il problema è che per ogni esempio l'architettura della rete cambia, quindi per aggiornare i
@@ -777,15 +778,24 @@ class Classifier:
             item_correct += batch_item_correct.item()
 
             # debug
-            print(f'class ground truth: {super_class_labels}')
-            print(f'class decisions: {class_decisions}')
-            print(f'item ground truth: {item_labels}')
-            print(f'item decisions: {item_decisions}')
+            super_class_labels = super_class_labels.tolist()
+            class_decisions = class_decisions.tolist()
+            item_labels = item_labels.tolist()
+            item_decisions = item_decisions.tolist()
+            for scl, cd, il, id, p in zip(super_class_labels, class_decisions, item_labels, item_decisions, image_paths):
+                submap = self.mapping[cd]
+                true_submap = self.mapping[scl]
+                submap.pop('identifier')
+                true_submap.pop('identifier')
+                inverse_submap = {v: k for k, v in submap.items()}
+                inverse_true_submap = {v: k for k, v in true_submap.items()}
+                inference.append({'path': p, 'super class label': scl, 'class output': cd,
+                                 'item label': inverse_true_submap[il], 'item output': inverse_submap[id]})
 
         class_accuracy = (class_correct / tot_cases) * 100.0  # accuracy sull'epoca (%)
         item_accuracy = (item_correct / tot_cases) * 100.0  # accuracy sull'epoca (%)
 
-        return class_accuracy, item_accuracy
+        return class_accuracy, item_accuracy, inference
 
     def train(self, train_loader: DataLoader, val_loader: DataLoader, split: int, epochs: int, lr: float):
         """
@@ -980,9 +990,11 @@ def main(args):
                     json.dump(inference, f)
                 print(f'Accuracy sui dati di test durante il fold {i + 1}: {test_accuracy}%.')
             else:
-                class_accuracy, item_accuracy = cls.test_moe(test_loader)
+                class_accuracy, item_accuracy, inference = cls.test_moe(test_loader)
                 moe_class_acc.append(class_accuracy)
                 moe_item_acc.append(item_accuracy)
+                with open(experiment_dir / f'fold_{i}' / 'inference.json', 'w') as f:
+                    json.dump(inference, f)
                 print(f'Class accuracy sui dati di test durante il fold {i + 1}: {class_accuracy}%.')
                 print(f'Item accuracy sui dati di test durante il fold {i + 1}: {item_accuracy}%.')
         if METHOD == 'naive':
