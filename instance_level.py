@@ -323,6 +323,7 @@ class Classifier:
         self.mapping = mapping
         if self.method == 'naive':
             self.num_classes = len(self.mapping)
+            print(self.mapping)
             self.inverse_mapping = {v: k for k, v in self.mapping.keys()}
             if self.backbone == 'resnet':
                 # carico il modello di resnet50 senza pretrain perchè alleno solo il layer finale
