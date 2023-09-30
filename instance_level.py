@@ -521,7 +521,7 @@ class Classifier:
             labels = [self.inverse_mapping[i] for i in labels.tolist()]
             batch_decisions = [self.inverse_mapping[i] for i in batch_decisions.tolist()]
             for l, d, p in zip(labels, batch_decisions, image_paths):
-                inference.append({'path': p[0], 'label': l, 'output': d})
+                inference.append({'path': p, 'label': l, 'output': d})
 
         accuracy = (correct / tot_cases) * 100.0  # accuracy sull'epoca (%)
 
