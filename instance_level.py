@@ -348,6 +348,13 @@ class Classifier:
 
         else:
             self.num_super_classes = len(self.mapping)  # numero delle superclassi
+            self.super_classes = [i for i in self.mapping]
+            self.inverse_submappings = []
+            for i in self.super_classes:
+                submap = self.mapping[i]
+                submap.pop('identifier')
+                inverse_submap = {v: k for k, v in submap.items()}
+                self.inverse_submappings.append(inverse_submap)
             # lista con il numero di sottoclassi per ogni superclasse (-1 perchè va scartato l'identifier della superclasse)
             self.len_item_classes = [len(self.mapping[key]) - 1 for key in self.mapping]
             # carico il modello pretrainato di resnet50 su imagenet
@@ -783,14 +790,10 @@ class Classifier:
             item_labels = item_labels.tolist()
             item_decisions = item_decisions.tolist()
             for scl, cd, il, id, p in zip(super_class_labels, class_decisions, item_labels, item_decisions, image_paths):
-                cd_code = list(self.mapping.keys())[cd]
-                scl_code = list(self.mapping.keys())[scl]
-                submap = self.mapping[cd_code]
-                true_submap = self.mapping[scl_code]
-                submap.pop('identifier')
-                true_submap.pop('identifier')
-                inverse_submap = {v: k for k, v in submap.items()}
-                inverse_true_submap = {v: k for k, v in true_submap.items()}
+                cd_code = self.super_classes[cd]
+                scl_code = self.super_classes[scl]
+                inverse_submap = self.inverse_submappings[cd]
+                inverse_true_submap = self.inverse_submappings[scl]
                 inference.append({'path': p, 'super class label': scl_code, 'class output': cd_code,
                                  'item label': inverse_true_submap[il], 'item output': inverse_submap[id]})
 
