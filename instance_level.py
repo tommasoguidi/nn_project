@@ -101,7 +101,7 @@ class MyDataset(Dataset):
         item_label = self.annos.loc[image_id, 'item_id']
         if self.method == 'naive':
             item_label = torch.tensor(self.mapping[item_label], dtype=torch.long)
-            return image, item_label, image_path
+            return image, item_label, (image_path,)
         else:
             item_label = torch.tensor(self.mapping[super_class_label][item_label], dtype=torch.long)
             super_class_label = torch.tensor(self.mapping[super_class_label]['identifier'], dtype=torch.long)
