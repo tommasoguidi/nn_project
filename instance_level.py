@@ -351,7 +351,7 @@ class Classifier:
             self.super_classes = [i for i in self.mapping]
             self.inverse_submappings = []
             for i in self.super_classes:
-                submap = self.mapping[i]
+                submap = self.mapping[i].copy()
                 submap.pop('identifier')
                 inverse_submap = {v: k for k, v in submap.items()}
                 self.inverse_submappings.append(inverse_submap)
