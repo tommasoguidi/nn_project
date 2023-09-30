@@ -4,4 +4,5 @@ runs/
 prove.py
 classifier.pth
 inference.json
+moe_inference.json
 visual_test.py
