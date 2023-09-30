@@ -8,9 +8,9 @@ from tqdm import tqdm
 
 src_dir = Path('runs')
 dest_dir = Path('nice_logs')
-interessanti = {'classifier': [3, 5, 7, 23],
+interessanti = {'classifier': [2, 3, 5, 7, 23, 27],
                 'instance_level': [3, 5, 9, 10, 28, 29, 31, 34, 36, 37],
-                'fsl': [5, 20, 25, 27, 38, 46, 50, 51]}
+                'fsl': [5, 20, 25, 27, 38, 46, 50, 51, 52, 53]}
 
 for script in tqdm(interessanti, total=3, leave=False, desc='SALVANDO LE LOG PIU INTERESSANTI...'):
     for run in tqdm(interessanti[script], leave=False, desc=f'...TRA QUELLE DI {script}'):
