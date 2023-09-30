@@ -323,7 +323,7 @@ class Classifier:
         self.mapping = mapping
         if self.method == 'naive':
             self.num_classes = len(self.mapping)
-            for k, v in self.mapping:
+            for k, v in self.mapping.keys():
                 print(k, v)
             self.inverse_mapping = {v: k for k, v in self.mapping.keys()}
             if self.backbone == 'resnet':
