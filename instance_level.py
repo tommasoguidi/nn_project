@@ -512,12 +512,12 @@ class Classifier:
 
             # conto le risposte corrette
             correct += torch.sum(batch_decisions == labels)  # totale risposte corrette
+            
+            # debug
+            print(f'ground truth: {labels}')
+            print(f'decisions: {batch_decisions}')
 
         accuracy = (correct / tot_cases) * 100.0  # accuracy sull'epoca (%)
-
-        # debug
-        print(f'ground truth: {labels}')
-        print(f'decisions: {batch_decisions}')
 
         return accuracy
 
@@ -770,14 +770,14 @@ class Classifier:
             batch_item_correct = torch.sum(torch.logical_and(class_bool, item_bool))
             item_correct += batch_item_correct.item()
 
+            # debug
+            print(f'class ground truth: {super_class_labels}')
+            print(f'class decisions: {class_decisions}')
+            print(f'item ground truth: {item_labels}')
+            print(f'item decisions: {item_decisions}')
+
         class_accuracy = (class_correct / tot_cases) * 100.0  # accuracy sull'epoca (%)
         item_accuracy = (item_correct / tot_cases) * 100.0  # accuracy sull'epoca (%)
-
-        # debug
-        print(f'class ground truth: {super_class_labels}')
-        print(f'class decisions: {class_decisions}')
-        print(f'item ground truth: {item_labels}')
-        print(f'item decisions: {item_decisions}')
 
         return class_accuracy, item_accuracy
 
