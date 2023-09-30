@@ -60,6 +60,7 @@ class MyDataset(Dataset):
         if self.method == 'naive':
             for i, item_id in enumerate(self.all_classes):
                 self.mapping[item_id] = i
+            self.inverse_mapping = {v: k for k, v in self.mapping.items()}
         else:
             for i, super_class in enumerate(self.all_super_classes):
                 # tutte le righe del dataframe relative ad una categoria merceologica
@@ -100,7 +101,7 @@ class MyDataset(Dataset):
         item_label = self.annos.loc[image_id, 'item_id']
         if self.method == 'naive':
             item_label = torch.tensor(self.mapping[item_label], dtype=torch.long)
-            return image, item_label
+            return image, item_label, image_path
         else:
             item_label = torch.tensor(self.mapping[super_class_label][item_label], dtype=torch.long)
             super_class_label = torch.tensor(self.mapping[super_class_label]['identifier'], dtype=torch.long)
@@ -319,8 +320,10 @@ class Classifier:
         self.ckpt_dir = ckpt_dir
         self.model = None
         self.pretrained = pretrained
+        self.mapping = mapping
         if self.method == 'naive':
-            self.num_classes = len(mapping)
+            self.num_classes = len(self.mapping)
+            self.inverse_mapping = {v: k for k, v in self.mapping.keys()}
             if self.backbone == 'resnet':
                 # carico il modello di resnet50 senza pretrain perchè alleno solo il layer finale
                 self.model = resnet50(num_classes=10)
@@ -344,9 +347,9 @@ class Classifier:
             # summary(self.model, input_size=(1, 3, 224, 224))
 
         else:
-            self.num_super_classes = len(mapping)  # numero delle superclassi
+            self.num_super_classes = len(self.mapping)  # numero delle superclassi
             # lista con il numero di sottoclassi per ogni superclasse (-1 perchè va scartato l'identifier della superclasse)
-            self.len_item_classes = [len(mapping[key]) - 1 for key in mapping]
+            self.len_item_classes = [len(self.mapping[key]) - 1 for key in self.mapping]
             # carico il modello pretrainato di resnet50 su imagenet
             self.model = MoE(self.backbone, self.num_super_classes, self.len_item_classes,
                              self.pretrained, weights, self.device)
@@ -404,7 +407,7 @@ class Classifier:
         epoch_correct = 0   # segno le prediction corrette della rete per poi calcolare l'accuracy
         tot_cases = 0       # counter dei casi totali (sarebbe la len(dataset_train))
         for sample in progress:
-            images, labels = sample             # non mi interessa della super class
+            images, labels, _ = sample             # non mi interessa della super class
             images, labels = images.to(self.device), labels.to(self.device)
 
             batch_cases = images.shape[0]  # numero di sample nel batch
@@ -454,7 +457,7 @@ class Classifier:
         epoch_correct = 0  # segno le prediction corrette della rete per poi calcolare l'accuracy
         tot_cases = 0  # counter dei casi totali (sarebbe la len(dataset_val))
         for sample in progress:
-            images, labels = sample  # __getitem__ restituisce una tupla (image, label)
+            images, labels, _ = sample  # __getitem__ restituisce una tupla (image, label)
             images, labels = images.to(self.device), labels.to(self.device)
 
             batch_cases = images.shape[0]  # numero di sample nel batch
@@ -498,8 +501,9 @@ class Classifier:
         progress = tqdm(dataloader, total=n_batches, leave=False, desc='TEST')
         correct = 0  # segno le prediction corrette della rete per poi calcolare l'accuracy
         tot_cases = 0  # counter dei casi totali (sarebbe la len(dataset_test))
+        inference = []
         for sample in progress:
-            images, labels = sample  # __getitem__ restituisce una tupla (image, label)
+            images, labels, image_paths = sample  # __getitem__ restituisce una tupla (image, label)
             images, labels = images.to(self.device), labels.to(self.device)
 
             batch_cases = images.shape[0]  # numero di sample nel batch
@@ -512,14 +516,16 @@ class Classifier:
 
             # conto le risposte corrette
             correct += torch.sum(batch_decisions == labels)  # totale risposte corrette
-            
+
             # debug
-            print(f'ground truth: {labels}')
-            print(f'decisions: {batch_decisions}')
+            labels = [self.inverse_mapping[i] for i in labels.tolist()]
+            batch_decisions = [self.inverse_mapping[i] for i in batch_decisions.tolist()]
+            for l, d, p in zip(labels, batch_decisions, image_paths):
+                inference.append({'path': p, 'label': l, 'output': d})
 
         accuracy = (correct / tot_cases) * 100.0  # accuracy sull'epoca (%)
 
-        return accuracy
+        return accuracy, inference
 
     def train_moe_one_epoch(self, dataloader, epoch, optimizer, criterion, writer):
         """
@@ -968,8 +974,10 @@ def main(args):
             weights = experiment_dir / f'fold_{i}' / 'classifier.pth'
             cls.load(weights)
             if METHOD == 'naive':
-                test_accuracy = cls.test_naive(test_loader)
+                test_accuracy, inference = cls.test_naive(test_loader)
                 naive_acc.append(test_accuracy)
+                with open(experiment_dir / f'fold_{i}' / 'inference.json', 'w') as f:
+                    json.dump(inference, f)
                 print(f'Accuracy sui dati di test durante il fold {i + 1}: {test_accuracy}%.')
             else:
                 class_accuracy, item_accuracy = cls.test_moe(test_loader)
