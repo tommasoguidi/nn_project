@@ -3,3 +3,5 @@ runs/
 .ipynb_checkpoints/
 prove.py
 classifier.pth
+inference.json
+visual_test.py
