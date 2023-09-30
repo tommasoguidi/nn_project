@@ -1,4 +1,5 @@
 runs/
 .idea/
+.ipynb_checkpoints/
 prove.py
 classifier.pth
