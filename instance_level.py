@@ -783,13 +783,15 @@ class Classifier:
             item_labels = item_labels.tolist()
             item_decisions = item_decisions.tolist()
             for scl, cd, il, id, p in zip(super_class_labels, class_decisions, item_labels, item_decisions, image_paths):
-                submap = self.mapping[cd]
-                true_submap = self.mapping[scl]
+                cd_code = list(self.mapping.keys())[cd]
+                scl_code = list(self.mapping.keys())[scl]
+                submap = self.mapping[cd_code]
+                true_submap = self.mapping[scl_code]
                 submap.pop('identifier')
                 true_submap.pop('identifier')
                 inverse_submap = {v: k for k, v in submap.items()}
                 inverse_true_submap = {v: k for k, v in true_submap.items()}
-                inference.append({'path': p, 'super class label': scl, 'class output': cd,
+                inference.append({'path': p, 'super class label': scl_code, 'class output': cd_code,
                                  'item label': inverse_true_submap[il], 'item output': inverse_submap[id]})
 
         class_accuracy = (class_correct / tot_cases) * 100.0  # accuracy sull'epoca (%)
