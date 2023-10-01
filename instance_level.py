@@ -181,19 +181,24 @@ class Concat(Dataset):
 
 class Head(nn.Module):
     """Questa è la classe base delle classification heads usate nel caso 'moe'."""
-    def __init__(self, in_features: int, classes: int):
+    def __init__(self, in_features: int, classes: int,  depth: int):
         super().__init__()
-        self.layer1 = nn.Linear(in_features, 4096)
-        self.layer2 = nn.Linear(4096, 2048)
-        self.layer3 = nn.Linear(2048, classes)
-        # self.layer1 = nn.Linear(in_features, classes)
+        self.depth = depth
+        if self.depth == 3:
+            self.layer1 = nn.Linear(in_features, 4096)
+            self.layer2 = nn.Linear(4096, 2048)
+            self.layer3 = nn.Linear(2048, classes)
+        else:
+            self.layer1 = nn.Linear(in_features, classes)
 
     def forward(self, x):
-        x = F.relu(self.layer1(x))
-        x = F.relu(self.layer2(x))
-        x = F.dropout(x)
-        logits = self.layer3(x)  # output della rete prima di applicare softmax
-        # logits = self.layer1(x)  # output della rete prima di applicare softmax
+        if self.depth == 3:
+            x = F.relu(self.layer1(x))
+            x = F.relu(self.layer2(x))
+            x = F.dropout(x)
+            logits = self.layer3(x)  # output della rete prima di applicare softmax
+        else:
+            logits = self.layer1(x)  # output della rete prima di applicare softmax
 
         return logits
 
@@ -263,7 +268,7 @@ class MoE(nn.Module):
     classe.
     """
     def __init__(self, backbone: str, num_super_classes: int, len_item_classes: list,
-                 pretrained: bool, weights: Path, device: str):
+                 pretrained: bool, weights: Path, device: str, depth: int):
         """
 
         :param num_super_classes:   'resnet' o 'resnet18'.
@@ -273,6 +278,7 @@ class MoE(nn.Module):
         :param pretrained:          se caricare il modello preallentato di resnet.
         :param weights:             percorso dei pesi da caricare.
         :param device:              cpu o gpu.
+        :param depth:               strati della head.
         """
         super().__init__()
         self.num_super_classes = num_super_classes
@@ -283,9 +289,9 @@ class MoE(nn.Module):
         # la i-esima istanza ha come in_features la dimensione delle feature uscenti dalla resnet dopo flatten() (2048)
         # e come classes il numero dei prodotti appartenenti alla i-esima super class
         if backbone == 'resnet':
-            self.heads = nn.ModuleList([Head(2048, self.len_item_classes[i]) for i in range(self.num_super_classes)])
+            self.heads = nn.ModuleList([Head(2048, self.len_item_classes[i], depth) for i in range(self.num_super_classes)])
         elif backbone == 'resnet18':
-            self.heads = nn.ModuleList([Head(512, self.len_item_classes[i]) for i in range(self.num_super_classes)])
+            self.heads = nn.ModuleList([Head(512, self.len_item_classes[i], depth) for i in range(self.num_super_classes)])
 
     def forward(self, x, super_class):
         # il metodo forward() di resnet è stato modificato per ritornare anche il feature vector
@@ -306,7 +312,8 @@ class MoE(nn.Module):
 class Classifier:
     """Classificatore per le 50 classi in esame"""
 
-    def __init__(self, backbone: str, method: str, device: str, ckpt_dir: Path, mapping: dict, weights: Path, pretrained: bool):
+    def __init__(self, backbone: str, method: str, device: str, ckpt_dir: Path, mapping: dict,
+                 weights: Path, pretrained: bool, depth: int):
         """
 
         :param method:      una tra 'resnet' e resnet18'.
@@ -316,6 +323,7 @@ class Classifier:
         :param mapping:     mapping delle classi.
         :param weights:     percorso dei pesi da caricare.
         :param pretrained:  se usare o meno il modello preallenato come backbone di MoE.
+        :param depth:               strati della head.
         """
         self.backbone = backbone
         self.method = method
@@ -362,7 +370,7 @@ class Classifier:
             self.len_item_classes = [len(self.mapping[key]) - 1 for key in self.mapping]
             # carico il modello pretrainato di resnet50 su imagenet
             self.model = MoE(self.backbone, self.num_super_classes, self.len_item_classes,
-                             self.pretrained, weights, self.device)
+                             self.pretrained, weights, self.device, depth)
             # stampa a schermo la rete
             # summary(self.model, input_size=(1, 3, 224, 224), super_class=1)
 
@@ -888,6 +896,7 @@ def main(args):
     N_FOLDS = args.n_folds
     DEVICE = args.device
     BACKBONE = args.backbone
+    DEPTH = args.depth
     EPOCHS = args.epochs
     BATCH_SIZE = args.batch_size
     NUM_WORKERS = args.num_workers
@@ -960,7 +969,7 @@ def main(args):
             train_ds = Concat(train_datasets)
             train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
 
-            cls = Classifier(BACKBONE, METHOD, DEVICE, actual_dir, class_mapping, WEIGHTS, PRETRAINED)
+            cls = Classifier(BACKBONE, METHOD, DEVICE, actual_dir, class_mapping, WEIGHTS, PRETRAINED, DEPTH)
             train_result = cls.train(train_loader, val_loader, i, EPOCHS, LR)      # alleno
             best_results.append(train_result)
 
@@ -989,7 +998,7 @@ def main(args):
         class_mapping = test_ds.mapping
         test_loader = DataLoader(test_ds, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS)
 
-        cls = Classifier(BACKBONE, METHOD, DEVICE, experiment_dir, class_mapping, WEIGHTS, pretrained=False)  # inizializzo il classificatore
+        cls = Classifier(BACKBONE, METHOD, DEVICE, experiment_dir, class_mapping, WEIGHTS, pretrained=False, depth=DEPTH)  # inizializzo il classificatore
         naive_acc, moe_class_acc, moe_item_acc = [], [], []
         for i in range(N_FOLDS):
             weights = experiment_dir / f'fold_{i}' / 'classifier.pth'
@@ -1028,6 +1037,7 @@ if __name__ == '__main__':
     parser.add_argument('-b', '--backbone', type=str, default='resnet',
                         help='Scegliere se utilizzare una semplice "cnn", "resnet" (50), "resnet18", "resnet10" '
                              'o "resnet12" come features extractor. (C, I, F)')
+    parser.add_argument('--depth', type=int, default=1, help='Strati della head. (I)')
     parser.add_argument('-e', '--epochs', type=int, default=25, help='Epoche per eseguire il train. (C, I, F)')
     parser.add_argument('--batch-size', type=int, default=16, help='Numero di esempi in ogni batch. (C, I)')
     parser.add_argument('--num-workers', type=int, default=3, help='Numero di worker. (C, I, F)')

@@ -445,6 +445,7 @@ if __name__ == '__main__':
     parser.add_argument('-b', '--backbone', type=str, default='resnet',
                         help='Scegliere se utilizzare una semplice "cnn", "resnet" (50), "resnet18", "resnet10" '
                              'o "resnet12" come features extractor. (C, I, F)')
+    parser.add_argument('--depth', type=int, default=1, help='Strati della head. (I)')
     parser.add_argument('-e', '--epochs', type=int, default=25, help='Epoche per eseguire il train. (C, I, F)')
     parser.add_argument('--batch-size', type=int, default=16, help='Numero di esempi in ogni batch. (C, I)')
     parser.add_argument('--num-workers', type=int, default=3, help='Numero di worker. (C, I, F)')
