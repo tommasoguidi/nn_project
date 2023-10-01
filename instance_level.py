@@ -183,17 +183,17 @@ class Head(nn.Module):
     """Questa è la classe base delle classification heads usate nel caso 'moe'."""
     def __init__(self, in_features: int, classes: int):
         super().__init__()
-        # self.layer1 = nn.Linear(in_features, 4096)
-        # self.layer2 = nn.Linear(4096, 2048)
-        # self.layer3 = nn.Linear(2048, classes)
-        self.layer1 = nn.Linear(in_features, classes)
+        self.layer1 = nn.Linear(in_features, 4096)
+        self.layer2 = nn.Linear(4096, 2048)
+        self.layer3 = nn.Linear(2048, classes)
+        # self.layer1 = nn.Linear(in_features, classes)
 
     def forward(self, x):
-        # x = F.relu(self.layer1(x))
-        # x = F.relu(self.layer2(x))
-        # x = F.dropout(x)
-        # logits = self.layer3(x)  # output della rete prima di applicare softmax
-        logits = self.layer1(x)  # output della rete prima di applicare softmax
+        x = F.relu(self.layer1(x))
+        x = F.relu(self.layer2(x))
+        x = F.dropout(x)
+        logits = self.layer3(x)  # output della rete prima di applicare softmax
+        # logits = self.layer1(x)  # output della rete prima di applicare softmax
 
         return logits
 
@@ -1008,8 +1008,8 @@ def main(args):
         if METHOD == 'naive':
             print(f'Naive accuracy media: {torch.mean(torch.tensor(naive_acc))}%.')
         else:
-            print(f'Class cccuracy media: {torch.mean(torch.tensor(class_accuracy))}%.')
-            print(f'Item accuracy media: {torch.mean(torch.tensor(item_accuracy))}%.')
+            print(f'Class cccuracy media: {torch.mean(torch.tensor(moe_class_acc))}%.')
+            print(f'Item accuracy media: {torch.mean(torch.tensor(moe_item_acc))}%.')
 
 
 if __name__ == '__main__':
