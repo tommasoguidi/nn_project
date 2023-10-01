@@ -195,7 +195,7 @@ class Head(nn.Module):
         if self.depth == 3:
             x = F.relu(self.layer1(x))
             x = F.relu(self.layer2(x))
-            # x = F.dropout(x)
+            x = F.dropout(x)
             logits = self.layer3(x)  # output della rete prima di applicare softmax
         else:
             logits = self.layer1(x)  # output della rete prima di applicare softmax
