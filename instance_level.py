@@ -724,7 +724,7 @@ class Classifier:
 
             epoch_item_loss += batch_item_loss
             # la classificazione del prodotto è corretta se lo era anche quella della super class
-            item_bool = (batch_item_decisions == item_labels.to(self.device))
+            item_bool = batch_item_decisions == item_labels.to(self.device)
             batch_item_correct = torch.sum(torch.logical_and(class_bool, item_bool))
             epoch_item_correct += batch_item_correct.item()
 
