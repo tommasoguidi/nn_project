@@ -792,10 +792,7 @@ class Classifier:
 
             # la classificazione del prodotto è corretta se lo era anche quella della super class
             item_bool = (item_decisions == item_labels.to(self.device))
-
-            batch_item_correct = torch.sum(item_bool)
-
-            # batch_item_correct = torch.sum(torch.logical_and(class_bool, item_bool))
+            batch_item_correct = torch.sum(torch.logical_and(class_bool, item_bool))
             item_correct += batch_item_correct.item()
 
             # # debug
