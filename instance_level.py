@@ -195,7 +195,7 @@ class Head(nn.Module):
         if self.depth == 3:
             x = F.relu(self.layer1(x))
             x = F.relu(self.layer2(x))
-            x = F.dropout(x)
+            # x = F.dropout(x)
             logits = self.layer3(x)  # output della rete prima di applicare softmax
         else:
             logits = self.layer1(x)  # output della rete prima di applicare softmax
@@ -991,7 +991,7 @@ def main(args):
         # a questo giro deve essere il percorso alla cartella dell'esperimento
         experiment_dir = CHECKPOINT_DIR
         # per creare il dataset passo il parametro split ma non serve (__init__ lo setta a n_folds)
-        test_ds = MyDataset(ROOT, N_FOLDS, split=0, mode='train', transforms=val_transforms, method=METHOD, seed=SEED)
+        test_ds = MyDataset(ROOT, N_FOLDS, split=0, mode=MODE, transforms=val_transforms, method=METHOD, seed=SEED)
         class_mapping = test_ds.mapping
         test_loader = DataLoader(test_ds, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS)
 
