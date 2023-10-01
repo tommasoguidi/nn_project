@@ -763,10 +763,16 @@ class Classifier:
             # adesso il problema è che per ogni esempio l'architettura della rete cambia, quindi per aggiornare i
             # gradienti non mi viene in mente altro che ciclare sui vari esempi, facendo lo step alla fine del ciclo
             # in modo da preservare la batch_mode
-            for image, _, _ in zip(images, super_class_labels, item_labels):
+            for image, super_class_label, _ in zip(images, super_class_labels, item_labels):
                 image = torch.unsqueeze(image.to(self.device), dim=0)
-                # output della rete, a questo giro come superclass prendo la prediction fatta dalla backbone
-                super_class_logit, super_class_output, item_logit, item_output = self.forward(image, None)
+
+                super_class_label = torch.unsqueeze(super_class_label.to(self.device), dim=0)
+                # output della rete
+                super_class_logit, super_class_output, item_logit, item_output = self.forward(image, super_class_label)
+
+
+                # # output della rete, a questo giro come superclass prendo la prediction fatta dalla backbone
+                # super_class_logit, super_class_output, item_logit, item_output = self.forward(image, None)
                 # il risultato di softmax viene interpretato con politica winner takes all
                 super_class_decision = torch.argmax(super_class_output, dim=1)  # adesso l'argomento è un vettore, non un batch
                 class_decisions.append(super_class_decision)
@@ -784,21 +790,24 @@ class Classifier:
 
             # la classificazione del prodotto è corretta se lo era anche quella della super class
             item_bool = (item_decisions == item_labels.to(self.device))
-            batch_item_correct = torch.sum(torch.logical_and(class_bool, item_bool))
+
+            batch_item_correct = torch.sum(class_bool, item_bool)
+
+            # batch_item_correct = torch.sum(torch.logical_and(class_bool, item_bool))
             item_correct += batch_item_correct.item()
 
-            # debug
-            super_class_labels = super_class_labels.tolist()
-            class_decisions = class_decisions.tolist()
-            item_labels = item_labels.tolist()
-            item_decisions = item_decisions.tolist()
-            for scl, cd, il, id, p in zip(super_class_labels, class_decisions, item_labels, item_decisions, image_paths):
-                cd_code = self.super_classes[cd]
-                scl_code = self.super_classes[scl]
-                inverse_submap = self.inverse_submappings[cd]
-                inverse_true_submap = self.inverse_submappings[scl]
-                inference.append({'path': p, 'super class label': scl_code, 'class output': cd_code,
-                                 'item label': inverse_true_submap[il], 'item output': inverse_submap[id]})
+            # # debug
+            # super_class_labels = super_class_labels.tolist()
+            # class_decisions = class_decisions.tolist()
+            # item_labels = item_labels.tolist()
+            # item_decisions = item_decisions.tolist()
+            # for scl, cd, il, id, p in zip(super_class_labels, class_decisions, item_labels, item_decisions, image_paths):
+            #     cd_code = self.super_classes[cd]
+            #     scl_code = self.super_classes[scl]
+            #     inverse_submap = self.inverse_submappings[cd]
+            #     inverse_true_submap = self.inverse_submappings[scl]
+            #     inference.append({'path': p, 'super class label': scl_code, 'class output': cd_code,
+            #                      'item label': inverse_true_submap[il], 'item output': inverse_submap[id]})
 
         class_accuracy = (class_correct / tot_cases) * 100.0  # accuracy sull'epoca (%)
         item_accuracy = (item_correct / tot_cases) * 100.0  # accuracy sull'epoca (%)
@@ -1001,10 +1010,10 @@ def main(args):
                 class_accuracy, item_accuracy, inference = cls.test_moe(test_loader)
                 moe_class_acc.append(class_accuracy)
                 moe_item_acc.append(item_accuracy)
-                with open(experiment_dir / f'fold_{i}' / 'inference.json', 'w') as f:
-                    json.dump(inference, f)
-                print(f'Class accuracy sui dati di test durante il fold {i + 1}: {class_accuracy}%.')
-                print(f'Item accuracy sui dati di test durante il fold {i + 1}: {item_accuracy}%.')
+                # with open(experiment_dir / f'fold_{i}' / 'inference.json', 'w') as f:
+                #     json.dump(inference, f)
+                # print(f'Class accuracy sui dati di test durante il fold {i + 1}: {class_accuracy}%.')
+                # print(f'Item accuracy sui dati di test durante il fold {i + 1}: {item_accuracy}%.')
         if METHOD == 'naive':
             print(f'Naive accuracy media: {torch.mean(torch.tensor(naive_acc))}%.')
         else:
