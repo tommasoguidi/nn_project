@@ -60,6 +60,7 @@ class MyDataset(FewShotDataset):
         #
         self.classes = sorted(self.annos['item_id'].unique().tolist())   # tutte le classi del dataset
         self.mapping = {item_id: i for i, item_id in enumerate(self.classes)}
+        self.inverse_mapping = {v: k for k, v in self.mapping.items()}
         # ciclicamente solo una porzione del dataset completo viene utilizzata (sarà usata come validation set)
         self.image_ids = self._get_ids_in_split()
         self.labels = self.annos.loc[self.image_ids, 'item_id'].to_list()  # lista con le classi dello split
@@ -209,13 +210,14 @@ def train_one_epoch(model: FewShotClassifier, dataloader: DataLoader, optimizer:
 
 
 @torch.no_grad()
-def validate(model: FewShotClassifier, val_loader: DataLoader, device: torch.device):
+def validate(model: FewShotClassifier, val_loader: DataLoader, device: torch.device, inv_map):
     model.eval()  # passa in modalità eval
 
     n_episodes = len(val_loader)
     progress = tqdm(val_loader, total=n_episodes, leave=False, desc='EVAL')
     epoch_correct = 0  # segno le prediction corrette della rete per poi calcolare l'accuracy
     tot_cases = 0  # counter dei casi totali (sarebbe la len(dataset_val))
+    inference = []
     for sample in progress:
         support_images, support_labels, query_images, query_labels, _ = sample
         support_images, support_labels = support_images.to(device), support_labels.to(device)
@@ -232,9 +234,16 @@ def validate(model: FewShotClassifier, val_loader: DataLoader, device: torch.dev
         postfix = {'batch_accuracy': (correct_predictions.item() / episode_cases) * 100.0}
         progress.set_postfix(postfix)
 
+        # debug
+        if inv_map:
+            labels = [inv_map[i] for i in query_labels.tolist()]
+            batch_decisions = [inv_map[i] for i in episode_predictions.tolist()]
+            for l, d in zip(labels, batch_decisions):
+                inference.append({'label': l, 'output': d})
+
     epoch_accuracy = (epoch_correct / tot_cases) * 100.0
 
-    return epoch_accuracy
+    return epoch_accuracy, inference
 
 
 def train(epochs: int, model: FewShotClassifier, train_loader: DataLoader, val_loader: DataLoader,
@@ -263,7 +272,7 @@ def train(epochs: int, model: FewShotClassifier, train_loader: DataLoader, val_l
         epoch_mean_loss = train_one_epoch(model, train_loader, optimizer, criterion, device, method, n_way)
         writer.add_scalar(f'Loss/Train', epoch_mean_loss, epoch + 1)
         # valido il modello attuale sul validation set e ottengo l'accuratezza attuale
-        acc_now = validate(model, val_loader, device)
+        acc_now, _ = validate(model, val_loader, device, inv_map=None)
         writer.add_scalar(f'Accuracy/Val', acc_now, epoch + 1)
         if scheduler:
             scheduler.step()
@@ -412,6 +421,7 @@ def main(args):
         experiment_dir = CHECKPOINT_DIR
         # per creare il dataset passo il parametro split ma non serve (__init__ lo setta a n_folds)
         test_ds = MyDataset(ROOT, N_FOLDS, split=0, mode=MODE, transforms=transforms, seed=SEED)
+        inv_map = test_ds.inverse_mapping
         test_sampler = TaskSampler(test_ds, n_way=N_WAY, n_shot=K_SHOT, n_query=N_QUERY, n_tasks=TEST_EPISODES)
         test_loader = DataLoader(test_ds, batch_sampler=test_sampler, num_workers=NUM_WORKERS, pin_memory=False,
                                  collate_fn=test_sampler.episodic_collate_fn)
@@ -432,9 +442,11 @@ def main(args):
             weights = experiment_dir / f'fold_{i}' / 'classifier.pth'
             model_state = torch.load(weights, map_location=DEVICE)
             classifier.load_state_dict(model_state["model"])
-            fold_acc = validate(classifier, test_loader, DEVICE)
+            fold_acc, inference = validate(classifier, test_loader, DEVICE, inv_map)
             test_acc.append(fold_acc)
             print(f'Accuracy sui dati di test durante il fold {i + 1}: {fold_acc}%.')
+            with open(experiment_dir / f'fold_{i}' / 'inference.json', 'w') as f:
+                json.dump(inference, f)
         print(f'Accuracy media: {torch.mean(torch.tensor(test_acc))}%.')
 
 
