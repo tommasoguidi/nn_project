@@ -408,7 +408,9 @@ def main(args):
         print(f'Accuracy media: {mean_accuracy}%.')
 
     else:
-        # TEST
+        # a questo giro deve essere il percorso alla cartella dell'esperimento
+        experiment_dir = CHECKPOINT_DIR
+        # per creare il dataset passo il parametro split ma non serve (__init__ lo setta a n_folds)
         test_ds = MyDataset(ROOT, N_FOLDS, split=0, mode=MODE, transforms=transforms, seed=SEED)
         test_sampler = TaskSampler(test_ds, n_way=N_WAY, n_shot=K_SHOT, n_query=N_QUERY, n_tasks=TEST_EPISODES)
         test_loader = DataLoader(test_ds, batch_sampler=test_sampler, num_workers=NUM_WORKERS, pin_memory=False,
@@ -425,11 +427,15 @@ def main(args):
         elif METHOD == 'match':
             classifier = MatchingNetworks(backbone=bb, feature_dimension=f_dim).to(DEVICE)
 
-        model_state = torch.load(WEIGHTS, map_location=DEVICE)
-        classifier.load_state_dict(model_state["model"])
-
-        accuracy = validate(classifier, test_loader, DEVICE, METHOD, N_WAY)
-        print(f'Accuracy sui dati di test: {accuracy}%.')
+        test_acc = []
+        for i in range(N_FOLDS):
+            weights = experiment_dir / f'fold_{i}' / 'classifier.pth'
+            model_state = torch.load(weights, map_location=DEVICE)
+            classifier.load_state_dict(model_state["model"])
+            fold_acc = validate(classifier, test_loader, DEVICE, METHOD, N_WAY)
+            test_acc.append(fold_acc)
+            print(f'Accuracy sui dati di test durante il fold {i + 1}: {fold_acc}%.')
+        print(f'Accuracy media: {torch.mean(torch.tensor(test_acc))}%.')
 
 
 if __name__ == '__main__':
