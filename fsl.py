@@ -228,7 +228,8 @@ def validate(model: FewShotClassifier, val_loader: DataLoader, device: torch.dev
         # output della rete
         model.process_support_set(support_images, support_labels)
         episode_predictions = model(query_images).detach().data
-        correct_predictions = torch.sum(torch.argmax(episode_predictions, dim=1) == query_labels)
+        episode_decisions = torch.argmax(episode_predictions, dim=1)
+        correct_predictions = torch.sum(episode_decisions == query_labels)
 
         epoch_correct += correct_predictions.item()
         postfix = {'batch_accuracy': (correct_predictions.item() / episode_cases) * 100.0}
@@ -237,7 +238,7 @@ def validate(model: FewShotClassifier, val_loader: DataLoader, device: torch.dev
         # debug
         if inv_map:
             labels = [inv_map[i] for i in query_labels.tolist()]
-            batch_decisions = [inv_map[i] for i in episode_predictions.tolist()]
+            batch_decisions = [inv_map[i] for i in episode_decisions.tolist()]
             for l, d in zip(labels, batch_decisions):
                 inference.append({'label': l, 'output': d})
 
