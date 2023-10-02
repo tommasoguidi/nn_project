@@ -238,9 +238,10 @@ def validate(model: FewShotClassifier, val_loader: DataLoader, device: torch.dev
         # debug
         if inv_map:
             labels = [inv_map[i] for i in query_labels.tolist()]
-            batch_decisions = [inv_map[i] for i in episode_decisions.tolist()]
-            for l, d in zip(labels, batch_decisions):
-                inference.append({'label': l, 'output': d})
+            batch_decisions = episode_decisions.tolist()
+            code_decisions = [inv_map[i] for i in batch_decisions]
+            for l, d, c in zip(labels, batch_decisions, code_decisions):
+                inference.append({'label': l, 'output': d, 'item_id': c})
 
     epoch_accuracy = (epoch_correct / tot_cases) * 100.0
 
