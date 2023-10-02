@@ -432,7 +432,7 @@ def main(args):
             weights = experiment_dir / f'fold_{i}' / 'classifier.pth'
             model_state = torch.load(weights, map_location=DEVICE)
             classifier.load_state_dict(model_state["model"])
-            fold_acc = validate(classifier, test_loader, DEVICE, METHOD, N_WAY)
+            fold_acc = validate(classifier, test_loader, DEVICE)
             test_acc.append(fold_acc)
             print(f'Accuracy sui dati di test durante il fold {i + 1}: {fold_acc}%.')
         print(f'Accuracy media: {torch.mean(torch.tensor(test_acc))}%.')
