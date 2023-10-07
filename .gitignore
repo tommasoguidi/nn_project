@@ -6,3 +6,4 @@ classifier.pth
 inference.json
 moe_inference.json
 visual_test.py
+get_figures.py
